@@ -1,0 +1,1061 @@
+---
+title: "Snake_venom_analysis"
+author: "Kevin Healy"
+date: "15 Jan  2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+# Upload stuff
+## Packages
+
+First the required packages are uplaoded. These include .MCMCglmm' which is used for the main linear analysis, 'phytools' and 'caper'. to handle the phylogenies and finaly 'hdrcde', 'wesanderson' and the 'MultiDisPlot.R' function to make some of the plots.
+
+```{r packages}
+
+library(phytools)
+library(caper)
+library(MCMCglmm)
+library(wesanderson)
+library(hdrcde)
+source("MultiDisPlot.R")
+```
+
+
+## data
+Next we uplaod the main data file. See the methods section in the main paper for a description of the data.
+
+```{r data}
+ld50_data <- read.csv("S2_snake_data.csv",header=T,sep=",")
+
+```
+
+## Phylogeny
+We use the phylogeny from Pyron et al 2014 to control for phylogeny in our main model.
+
+```{r phylo}
+tree <- read.tree("liz_and_snake_time_tree.txt")
+#this seems to fix a dublicate problem caused by polynomies in the tree
+Tree<-makeLabel(tree)
+Tree<-makeLabel(Tree)
+```
+
+
+## Data transformation
+To allow for comparison of effect sizes we log transform all continous variables and z-score them.
+
+```{r transform}
+
+ld50_clean  <- ld50_data
+#length
+len.v <- log10(ld50_clean$length_cm)
+len.v <- (len.v - mean(len.v))/(sd(len.v))
+
+#mass
+mass <- log10(ld50_clean $mass_grams)
+mass <- (mass- mean(mass))/(sd(mass))
+
+animal <- ld50_clean $species
+species <- ld50_clean $species
+
+##volume
+vol.v <- log10(as.numeric(as.vector(ld50_clean $venom_yield_mg)))
+vol.v <- (vol.v - mean(vol.v))/(sd(vol.v))
+
+#dimension
+dimensions <- ld50_clean $dimensions
+
+#LD50
+ld50_10 <- log10(as.vector(ld50_clean $ld50_mg))
+ld50_mg <- (ld50_10- mean(ld50_10))/(sd(ld50_10))
+
+
+ld50_method <- ld50_clean $ld50_method
+
+eggs <- ld50_clean[,c("eggs")] 
+egg.bin <- rep(0,length(eggs))
+for(i in 1:(length(eggs))){
+	
+if(ld50_clean[i,c("eggs")] > 0) egg.bin[i] <- "yes"
+else egg.bin[i] <- "no"
+}
+
+weigted.dist.v <- (ld50_clean$phylo_distance_diet_model_my)
+weigted.dist.v <- (weigted.dist.v- mean(weigted.dist.v))/(sd(weigted.dist.v))
+
+env <- ld50_clean$environment
+
+con <- ld50_clean$constriction
+
+fam <- ld50_clean$family
+
+
+mod_class <- ld50_clean$ld50_model_class
+
+```
+
+
+## full model
+
+Now we set up the model to insure that there is a corresponding animal column within the dataframe in order for the phylogeny to match up. We also include as speerate "species" term to account for variation assocaited with multiple measures for a single species.
+
+```{r full model setup}
+
+
+###full model variables
+mydat.max <- data.frame(animal, 
+                        species, 
+                        mass, 
+                        weigted.dist.v = weigted.dist.v, 
+                        vol.v, 
+                        dimensions = dimensions, 
+                        ld50 = ld50_10, 
+                        ld50_method, 
+                        dimensions, 
+                        egg.bin, 
+                        env, 
+                        con, 
+                        fam)
+
+spec_dropped <-as.data.frame(matrix(0, nrow = c(length(levels(mydat.max[,"species"]))), 
+                                    ncol = c(2), dimnames = list(c(),c("species","dummy"))))
+spec_dropped[,1] <- levels(mydat.max$species)
+spec_dropped[,2] <- rep(0,length = c(length(levels(mydat.max[,"species"]))))
+spec_dropped <- as.data.frame(spec_dropped)
+
+max.dat <- comparative.data(data= spec_dropped, 
+                            phy= Tree, 
+                            names.col="species", 
+                            vcv=FALSE)
+
+max.tree <- chronoMPL(max.dat$phy)
+
+max.dropped <- max.dat$dropped$unmatched.rows
+
+mydat.MAX <- mydat.max
+if((length(max.dropped) > c(0)) == TRUE){
+for(i in 1:(length(max.dropped))){
+mydat.MAX <-mydat.MAX[mydat.MAX$species != max.dropped[i],]
+}
+}
+
+
+##clean up the final matched data.frame
+mydat.MAX <- as.data.frame(as.matrix(mydat.MAX))
+
+mydat.MAX <- data.frame(animal = mydat.MAX$species, 
+species = mydat.MAX$species, 
+mass.aa = (as.numeric(as.character(mydat.MAX$mass))), 
+weigted.dist.v = (as.numeric(as.character(mydat.MAX$weigted.dist.v))), 
+vol.v = (as.numeric(as.character(mydat.MAX$vol.v))), 
+ld50 = (as.numeric(as.character(mydat.MAX$ld50))), 
+ld50_method  = factor(mydat.MAX$ld50_method, 
+                       levels = c("sc","iv","ip","im")), 
+dim = mydat.MAX$dimensions, 
+egg.bin = mydat.MAX$egg.bin, 
+env = factor(mydat.MAX$env, 
+             levels = c("terrestrial","arboreal","aquatic")),
+con = mydat.MAX$con,
+fam = mydat.MAX$fam)
+
+
+
+```
+
+
+
+##Set the parameters
+Here we set the number of iterations, the thinning and the burn-in
+
+```{r parameters}
+#if you want to include species and ld50 method as a fixed term.
+
+#nitt <- 1200000
+#thin <- 500
+#burnin <- 200000
+
+nitt <- 12000
+thin <- 5
+burnin <- 2000
+
+```
+
+
+##Set the prior
+
+Set the proir. Here we stick with a x prior.
+
+```{r prior}
+prior<-list(R = list(V = diag(2), nu=0.002), 
+            G = list(G1=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3),
+                     G2=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3)))
+```
+
+##Run the full model
+Now we run the full model with both venom volume and Ld50 included as response variables. We also allow for co-variance between these two terms.
+
+```{r full model}
+
+full_model <- MCMCglmm(cbind(vol.v,ld50) ~ 
+                         trait:mass.aa + 
+                         trait:ld50_method + 
+                         trait:dim + 
+                         trait:egg.bin + 
+                         trait:weigted.dist.v, 
+                       random = ~us(trait):animal + 
+                                 us(trait):species,
+                       rcov=~us(trait):units, 
+                       data = mydat.MAX, 
+                       pedigree = max.tree, 
+                       prior = prior,
+                       family=c("gaussian","gaussian"), 
+                       nitt = nitt, thin = thin, burnin = burnin,
+                       verbose= FALSE)
+
+summary(full_model)
+```
+
+
+##Run the full model
+Now we calulated the proportion of variance associated with phylogeny, species level and risidual for both volume and LD50
+
+```{r H2}
+ld_50_prop_phlyo <- full_model$VCV[,"traitld50:traitld50.animal"]/
+                    (full_model$VCV[,"traitld50:traitld50.animal"] +
+                     full_model$VCV[,"traitld50:traitld50.species"] +
+                     full_model$VCV[,"traitld50:traitld50.units"] +
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_prop_species <- full_model$VCV[,"traitld50:traitld50.species"]/
+                    (full_model$VCV[,"traitld50:traitld50.animal"] +
+                     full_model$VCV[,"traitld50:traitld50.species"] +
+                     full_model$VCV[,"traitld50:traitld50.units"]+
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_prop_units <- full_model$VCV[,"traitld50:traitld50.units"]/
+                    (full_model$VCV[,"traitld50:traitld50.animal"] +
+                     full_model$VCV[,"traitld50:traitld50.species"] +
+                     full_model$VCV[,"traitld50:traitld50.units"]+
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+hdr(ld_50_prop_phlyo)
+hdr(ld_50_prop_species)
+hdr(ld_50_prop_units)
+
+
+
+vol_prop_phlyo <-  full_model$VCV[,"traitvol.v:traitvol.v.animal"]/
+                    (full_model$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.species"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.units"] +
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+vol_prop_spec <-  full_model$VCV[,"traitld50:traitvol.v.species"]/
+                    (full_model$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.species"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.units"] +
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+vol_prop_units <-  full_model$VCV[,"traitvol.v:traitvol.v.units"]/
+                    (full_model$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.species"] +
+                     full_model$VCV[,"traitvol.v:traitvol.v.units"] +
+                         full_model$VCV[,"traitld50:traitvol.v.animal"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.species"] + 
+                         full_model$VCV[,"traitld50:traitvol.v.units"])
+
+
+hdr(vol_prop_phlyo)
+hdr(vol_prop_spec)
+hdr(vol_prop_units)
+
+```
+
+###plot the full model
+
+We plot the posterior distributions in a table using the `MultiDisPlot` function.
+
+```{r MultiDisPlot plot}
+
+vol_post <- list(full_model$Sol[,1],
+                 full_model$Sol[,"traitvol.v:mass.aa"],
+                 full_model$Sol[,"traitvol.v:ld50_methodiv"],
+                 full_model$Sol[,"traitvol.v:ld50_methodip"],
+                 full_model$Sol[,"traitvol.v:ld50_methodim"],
+                 full_model$Sol[,"traitvol.v:dim3"],
+                 full_model$Sol[,"traitvol.v:egg.binyes"],
+                 full_model$Sol[,"traitvol.v:weigted.dist.v"],
+                 vol_prop_phlyo,
+                 full_model$VCV[,"traitld50:traitvol.v.animal"],
+                 vol_prop_spec,
+                 full_model$VCV[,"traitld50:traitvol.v.species"],
+                 vol_prop_units,
+                 full_model$VCV[,"traitld50:traitvol.v.units"])
+MultiDisPlot(vol_post)
+abline(v = 0, lty = 2)
+
+ld50_post <- list(full_model$Sol[,1],
+                 full_model$Sol[,"traitld50:mass.aa"],
+                 full_model$Sol[,"traitld50:ld50_methodiv"],
+                 full_model$Sol[,"traitld50:ld50_methodip"],
+                 full_model$Sol[,"traitld50:ld50_methodim"],
+                 full_model$Sol[,"traitld50:dim3"],
+                 full_model$Sol[,"traitld50:egg.binyes"],
+                 full_model$Sol[,"traitld50:weigted.dist.v"],
+                 ld_50_prop_phlyo,
+                 full_model$VCV[,"traitld50:traitvol.v.animal"],
+                 ld_50_prop_species,
+                 full_model$VCV[,"traitld50:traitvol.v.species"],
+                 ld_50_prop_units,
+                 full_model$VCV[,"traitld50:traitvol.v.units"]
+                 )
+MultiDisPlot(ld50_post)
+abline(v = 0, lty = 2)
+```
+
+
+#Main figure Plots
+Lets plot the main analysis
+First the volume plot
+```{r volume plot}
+pal <- wes_palette("Zissou", 4, type = "continuous")
+
+
+#pdf("vol_plot.pdf")
+plot(mydat.MAX[mydat.MAX$dim == "1" & mydat.MAX$egg.bin == "no", "vol.v"] ~  mydat.MAX[mydat.MAX$dim == "1" & mydat.MAX$egg.bin == "no", "mass.aa"], 
+     pch = 16, 
+     xlab= expression(log[10]*Mass*(g)), 
+     ylab = expression(log[10]*venom*(mg)), 
+     bty = "l" , 
+     col = pal[4], 
+     ylim = c(-1,3.5),  
+     xlim = c(1.5,4.5)) 
+
+points(mydat.MAX[mydat.MAX$dim == "3"  & mydat.MAX$egg.bin == "no", "vol.v"] ~ mydat.MAX[mydat.MAX$dim == "3"  & mydat.MAX$egg.bin == "no" , "mass.aa"], 
+       pch = 16, 
+       col = pal[1])
+
+points(mydat.MAX[mydat.MAX$dim == "1"  & mydat.MAX$egg.bin == "yes", "vol.v"] ~ mydat.MAX[mydat.MAX$dim == "1"  & mydat.MAX$egg.bin == "yes" , "mass.aa"], 
+       pch = 17, 
+       col = pal[4] )
+
+points(mydat.MAX[mydat.MAX$dim == "3"  & mydat.MAX$egg.bin == "yes", "vol.v"] ~ mydat.MAX[mydat.MAX$dim == "3"  & mydat.MAX$egg.bin == "yes" , "mass.aa"], 
+       pch = 17, 
+       col = pal[1] )
+
+
+points(mydat.MAX[ mydat.MAX$species ==  "Thamnophis_elegans", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Thamnophis_elegans", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Emydocephalus_annulatus", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Emydocephalus_annulatus", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Causus_rhombeatus", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Causus_rhombeatus", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Atractaspis_bibronii", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Atractaspis_bibronii", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Hydrophis_elegans", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Hydrophis_elegans", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Agkistrodon_piscivorus", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Agkistrodon_piscivorus", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Ophiophagus_hannah", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Ophiophagus_hannah", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Daboia_russelii", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Daboia_russelii", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Bungarus_multicinctus", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Bungarus_multicinctus", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Oxyuranus_scutellatus", "vol.v"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Oxyuranus_scutellatus", "mass.aa"] 
+       , col = "white", 
+       pch = 20)
+
+abline(summary(full_model)$solutions[1,1], 
+       summary(full_model)$solutions[2,1], 
+       col = pal[4], 
+       lw =2)
+
+abline(summary(full_model)$solutions[1,1] + summary(full_model)$solutions[10,1],
+       summary(full_model)$solutions[2,1], 
+       col = pal[1], 
+       lw =2 )
+
+#dev.off()
+```
+
+nest the LD50 plot.
+
+```{r ld50 plot}
+###plots
+###LD50
+
+#pdf("ld50_plot.pdf")
+
+plot(mydat.MAX$ld50 ~ (mydat.MAX$weigted.dist.v), 
+     pch = 16, 
+     xlab=  expression(paste("Mean phylogenetic distance between diet and ", 
+     LD[50], 
+     " model (Myr)", 
+     sep= " ")), 
+     ylab = expression(paste(log[10]*LD[50], 
+     " (mg/kg)")), 
+     bty = "l", 
+     col = pal[3])
+
+points(mydat.MAX[mydat.MAX$ld50_method == "iv", "ld50"] ~ 
+         mydat.MAX[mydat.MAX$ld50_method == "iv", "weigted.dist.v"], 
+       pch = 16, 
+       col = pal[4])
+
+points(mydat.MAX[mydat.MAX$ld50_method == "sc", "ld50"] ~ 
+         mydat.MAX[mydat.MAX$ld50_method == "sc" , "weigted.dist.v"], 
+       pch = 16, 
+       col = pal[3])
+
+points(mydat.MAX[mydat.MAX$ld50_method == "im", "ld50"] ~ 
+         mydat.MAX[mydat.MAX$ld50_method == "im" , "weigted.dist.v"], 
+       pch = 16, 
+       col = pal[1])
+
+points(mydat.MAX[mydat.MAX$ld50_method == "ip", "ld50"] ~ 
+         mydat.MAX[mydat.MAX$ld50_method == "ip" , "weigted.dist.v"], 
+       pch = 16, 
+       col = pal[2])
+
+points(mydat.MAX[mydat.MAX$egg.bin == "yes", "ld50"] ~ 
+         mydat.MAX[mydat.MAX$egg.bin == "yes" , "weigted.dist.v"], 
+       pch = 17, 
+       col = pal[3])
+
+
+points(mydat.MAX[ mydat.MAX$species ==  "Thamnophis_elegans", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Thamnophis_elegans", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Emydocephalus_annulatus", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Emydocephalus_annulatus", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Causus_rhombeatus", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Causus_rhombeatus", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+
+points(mydat.MAX[ mydat.MAX$species ==  "Agkistrodon_piscivorus", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Agkistrodon_piscivorus", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Ophiophagus_hannah", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Ophiophagus_hannah", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Daboia_russelii", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Daboia_russelii", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Bungarus_multicinctus", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Bungarus_multicinctus", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+points(mydat.MAX[ mydat.MAX$species ==  "Oxyuranus_scutellatus", "ld50"] ~
+       mydat.MAX[ mydat.MAX$species ==  "Oxyuranus_scutellatus", "weigted.dist.v"] 
+       , col = "white", 
+       pch = 20)
+
+
+abline(summary(full_model)$solutions[1,1], 
+       summary(full_model)$solutions[15,1], 
+       col = pal[2], 
+       lw =2)
+
+#dev.off()
+
+```
+
+
+#plot phylo
+We can also plot the phylogeny
+
+```{r phylo plot}
+
+#First make a named vector of the mean trait value.
+
+plot_LD50 <- vector()
+plot_vol <- vector()
+
+
+for(i in 1:length(levels(species))){
+  
+  plot_LD50[i] <-  min(ld50_data[ ld50_data$species ==  levels(species)[i] ,
+                                  "ld50_mg"])
+  plot_vol[i] <-  (ld50_data[ ld50_data$species ==  levels(species)[i] ,
+                              "venom_yield_mg"])
+
+}
+
+names(plot_LD50) <- sort(max.tree$tip.label)
+names(plot_vol) <- sort(max.tree$tip.label)
+
+#pdf("phylobar_ld50.pdf")
+plotTree.wBars(tree = max.tree, 
+               x = plot_LD50, 
+               scale= 1, 
+               type="fan", 
+               cex = 0.2, 
+               tip.labels = T, 
+               fsize=0.37, 
+               width = 1)
+#dev.off()
+
+#pdf("phylobar_vol.pdf")
+plotTree.wBars(tree = max.tree, 
+               x = plot_vol, 
+               scale= 0.04, 
+               type="fan", 
+               cex = 0.2, 
+               tip.labels = T, 
+               fsize=0.37, 
+               width = 1)
+#dev.off()
+
+```
+
+
+
+
+#Supplemntary models
+
+Now lets rerun the analysis for when we include constriction, family level and prey size.
+
+##Run the constriction model
+Constriction Model
+
+```{r constriction model}
+#if you want to include species and ld50 method as a fixed term.
+prior<-list(R = list(V = diag(2), nu=0.002), 
+            G = list(G1=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3),
+                     G2=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3)))
+
+
+######for constriction
+con_mod <- MCMCglmm(cbind(vol.v,ld50) ~ 
+                      trait:mass.aa + 
+                      trait:ld50_method+ 
+                      trait:con + 
+                      trait:dim + 
+                      trait:egg.bin + 
+                      trait:weigted.dist.v, 
+                    random = ~us(trait):animal + 
+                              us(trait):species,
+                    rcov=~us(trait):units, 
+                    data = mydat.MAX, 
+                    pedigree = max.tree, 
+                    prior = prior,
+                    family=c("gaussian","gaussian"), 
+                    nitt = nitt, thin = thin, burnin = burnin,
+                    verbose = FALSE)
+
+
+summary(con_mod)
+
+
+ld_50_con_phlyo <- con_mod$VCV[,"traitld50:traitld50.animal"]/
+                    (con_mod$VCV[,"traitld50:traitld50.animal"] +
+                     con_mod$VCV[,"traitld50:traitld50.species"] +
+                     con_mod$VCV[,"traitld50:traitld50.units"] +
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_con_species <- con_mod$VCV[,"traitld50:traitld50.species"]/
+                    (con_mod$VCV[,"traitld50:traitld50.animal"] +
+                     con_mod$VCV[,"traitld50:traitld50.species"] +
+                     con_mod$VCV[,"traitld50:traitld50.units"]+
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_con_units <- con_mod$VCV[,"traitld50:traitld50.units"]/
+                    (con_mod$VCV[,"traitld50:traitld50.animal"] +
+                     con_mod$VCV[,"traitld50:traitld50.species"] +
+                     con_mod$VCV[,"traitld50:traitld50.units"]+
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+hdr(ld_50_con_phlyo)
+hdr(ld_50_con_species)
+hdr(ld_50_con_units)
+
+
+
+vol_con_phlyo <-  con_mod$VCV[,"traitvol.v:traitvol.v.animal"]/
+                    (con_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_con_spec <-  con_mod$VCV[,"traitld50:traitvol.v.species"]/
+                    (con_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_con_units <-  con_mod$VCV[,"traitvol.v:traitvol.v.units"]/
+                    (con_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     con_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         con_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         con_mod$VCV[,"traitld50:traitvol.v.units"])
+
+
+hdr(vol_con_phlyo)
+hdr(vol_con_spec)
+hdr(vol_con_units)
+
+```
+
+
+##Run the environment model
+Model with environment type included
+
+```{r env model}
+#if you want to include species and ld50 method as a fixed term.
+prior<-list(R = list(V = diag(2), nu=0.002), 
+            G = list(G1=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3),
+                     G2=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3)))
+
+######for environment
+env_mod <- MCMCglmm(cbind(vol.v,ld50) ~ 
+                      trait:mass.aa + 
+                      trait:ld50_method + 
+                      trait:env + 
+                      trait:egg.bin + 
+                      trait:weigted.dist.v, 
+                    random = ~us(trait):animal + 
+                              us(trait):species,
+                    rcov=~us(trait):units, 
+                    data = mydat.MAX, 
+                    pedigree = max.tree, 
+                    prior = prior,
+                    family=c("gaussian","gaussian"), 
+                    nitt = nitt, thin =thin, burnin = burnin,
+                    verbose = FALSE)
+
+summary(env_mod)
+
+
+ld_50_env_phlyo <- env_mod$VCV[,"traitld50:traitld50.animal"]/
+                    (env_mod$VCV[,"traitld50:traitld50.animal"] +
+                     env_mod$VCV[,"traitld50:traitld50.species"] +
+                     env_mod$VCV[,"traitld50:traitld50.units"] +
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_env_species <- env_mod$VCV[,"traitld50:traitld50.species"]/
+                    (env_mod$VCV[,"traitld50:traitld50.animal"] +
+                     env_mod$VCV[,"traitld50:traitld50.species"] +
+                     env_mod$VCV[,"traitld50:traitld50.units"]+
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_env_units <- env_mod$VCV[,"traitld50:traitld50.units"]/
+                    (env_mod$VCV[,"traitld50:traitld50.animal"] +
+                     env_mod$VCV[,"traitld50:traitld50.species"] +
+                     env_mod$VCV[,"traitld50:traitld50.units"]+
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+hdr(ld_50_env_phlyo)
+hdr(ld_50_env_species)
+hdr(ld_50_env_units)
+
+
+
+vol_env_phlyo <-  env_mod$VCV[,"traitvol.v:traitvol.v.animal"]/
+                    (env_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_env_spec <-  env_mod$VCV[,"traitld50:traitvol.v.species"]/
+                    (env_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_env_units <-  env_mod$VCV[,"traitvol.v:traitvol.v.units"]/
+                    (env_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     env_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         env_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         env_mod$VCV[,"traitld50:traitvol.v.units"])
+
+
+hdr(vol_env_phlyo)
+hdr(vol_env_spec)
+hdr(vol_env_units)
+
+```
+
+##family model
+Model with family level included
+
+```{r fam model}
+#if you want to include species and ld50 method as a fixed term.
+prior<-list(R = list(V = diag(2), nu=0.002), 
+            G = list(G1=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3),
+                     G2=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3)))
+
+
+######for constriction
+fam_mod <- MCMCglmm(cbind(vol.v,ld50) ~ trait:mass.aa + 
+                      trait:ld50_method + 
+                      trait:fam + 
+                      trait:dim + 
+                      trait:egg.bin + 
+                      trait:weigted.dist.v, 
+                    random = ~us(trait):animal + 
+                              us(trait):species,
+                    rcov=~us(trait):units, 
+                    data = mydat.MAX, 
+                    pedigree = max.tree, 
+                    prior = prior,
+                    family=c("gaussian","gaussian"), 
+                    nitt = nitt, thin =thin, burnin = burnin,
+                    verbose = FALSE)
+
+
+ld_50_fam_phlyo <- fam_mod$VCV[,"traitld50:traitld50.animal"]/
+                    (fam_mod$VCV[,"traitld50:traitld50.animal"] +
+                     fam_mod$VCV[,"traitld50:traitld50.species"] +
+                     fam_mod$VCV[,"traitld50:traitld50.units"] +
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_fam_species <- fam_mod$VCV[,"traitld50:traitld50.species"]/
+                    (fam_mod$VCV[,"traitld50:traitld50.animal"] +
+                     fam_mod$VCV[,"traitld50:traitld50.species"] +
+                     fam_mod$VCV[,"traitld50:traitld50.units"]+
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+ld_50_fam_units <- fam_mod$VCV[,"traitld50:traitld50.units"]/
+                    (fam_mod$VCV[,"traitld50:traitld50.animal"] +
+                     fam_mod$VCV[,"traitld50:traitld50.species"] +
+                     fam_mod$VCV[,"traitld50:traitld50.units"]+
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+hdr(ld_50_fam_phlyo)
+hdr(ld_50_fam_species)
+hdr(ld_50_fam_units)
+
+
+
+vol_fam_phlyo <-  fam_mod$VCV[,"traitvol.v:traitvol.v.animal"]/
+                    (fam_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_fam_spec <-  fam_mod$VCV[,"traitld50:traitvol.v.species"]/
+                    (fam_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+vol_fam_units <-  fam_mod$VCV[,"traitvol.v:traitvol.v.units"]/
+                    (fam_mod$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.species"] +
+                     fam_mod$VCV[,"traitvol.v:traitvol.v.units"] +
+                         fam_mod$VCV[,"traitld50:traitvol.v.animal"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.species"] + 
+                         fam_mod$VCV[,"traitld50:traitvol.v.units"])
+
+
+hdr(vol_fam_phlyo)
+hdr(vol_fam_spec)
+hdr(vol_fam_units)
+
+
+
+summary(fam_mod)
+```
+
+
+#Models including prey size
+Set up the dataset which includes prey and has a matching phylogeny
+
+```{r prey model setup}
+
+
+###full model
+mydat.prey <- na.omit(data.frame(animal, 
+                                 species, 
+                                 mass, 
+                                 weigted.dist.v = weigted.dist.v, 
+                                 vol.v, 
+                                 dimensions = dimensions, 
+                                 ld50 = ld50_10, 
+                                 ld50_method, 
+                                 dimensions, 
+                                 egg.bin, 
+                                 env, 
+                                 con, 
+                                 fam, 
+                                 prey_mass = ld50_clean$prey_size_g, 
+                                 mod_class, 
+                                 prey_max = ld50_clean$max_prey_g))
+
+
+mydat.prey <- mydat.prey[mydat.prey$animal != "Causus_rhombeatus",]
+
+
+spec_dropped <-as.data.frame(matrix(0, nrow = c(length(levels(mydat.prey[,"species"]))), 
+                                    ncol = c(2), 
+                                    dimnames = list(c(),c("species","dummy"))))
+
+spec_dropped[,1] <- levels(mydat.prey$species)
+spec_dropped[,2] <- rep(0,length = c(length(levels(mydat.prey[,"species"]))))
+spec_dropped <- as.data.frame(spec_dropped)
+
+prey.dat <- comparative.data(data= spec_dropped, 
+                             phy= Tree, 
+                             names.col="species", 
+                             vcv=FALSE)
+
+prey.tree <- chronoMPL(prey.dat$phy)
+
+prey.dropped <- prey.dat$dropped$unmatched.rows
+
+mydat.P <- mydat.prey
+if((length(prey.dropped) > c(0)) == TRUE){
+for(i in 1:(length(prey.dropped))){
+mydat.P <-mydat.P[mydat.P$species != prey.dropped[i],]
+}
+}
+
+mydat.P <- as.data.frame(as.matrix(mydat.P))
+
+prey_mean <- (log10(as.numeric(as.character(mydat.P$prey_mass))) -
+                mean(log10(as.numeric(as.character(mydat.P$prey_mass)))))
+              /sd(log10(as.numeric(as.character(mydat.P$prey_mass))))
+
+prey_max <- (log10(as.numeric(as.character(mydat.P$prey_max))) -
+               mean(log10(as.numeric(as.character(mydat.P$prey_max)))))
+              /sd(log10(as.numeric(as.character(mydat.P$prey_max))))
+
+
+
+mydat.P <- data.frame(animal = mydat.P$species, 
+species = mydat.P$species, 
+mass.aa = (as.numeric(as.character(mydat.P$mass))), 
+weigted.dist.v = (as.numeric(as.character(mydat.P$weigted.dist.v))), 
+vol.v = (as.numeric(as.character(mydat.P$vol.v))), 
+ld50 = (as.numeric(as.character(mydat.P$ld50))), 
+ld50_method  =  factor(mydat.P$ld50_method, 
+                       levels = c("sc","iv","ip","im")), 
+dim = mydat.P$dimensions, 
+egg.bin = mydat.P$egg.bin, 
+env = factor(mydat.P$env, 
+             levels = c("terrestrial","arboreal","aquatic")),
+con = mydat.P$con,
+fam = mydat.P$fam,
+mod_class_p = mydat.P$mod_class,
+prey_mean = prey_mean,
+prey_max = prey_max)
+
+```
+
+##Prey model
+Run the main model with prey size included 
+
+```{r prey model run}
+#if you want to include species and ld50 method as a fixed term.
+prior<-list(R = list(V = diag(2), nu=0.002), 
+            G = list(G1=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3),
+                     G2=list(V = diag(2)/2,n = 2, 
+                             alpha.mu=rep(0,2), 
+                             alpha.V=diag(2)*10^3)))
+
+
+nitt_p <- 120000
+thin_p <- 50
+burnin_p <- 20000
+
+
+######with prey included
+prey_mod_long <- MCMCglmm(cbind(vol.v,ld50) ~ 
+                            trait:mass.aa + 
+                            trait:ld50_method + 
+                            trait:prey_mean + 
+                            trait:dim + 
+                            trait:egg.bin + 
+                            trait:weigted.dist.v, 
+                          random = ~us(trait):animal + 
+                                    us(trait):species,
+                          rcov=~us(trait):units, 
+                          data = mydat.P, 
+                          pedigree = prey.tree, 
+                          prior = prior,
+                          family=c("gaussian","gaussian"), 
+                          nitt = nitt_p, thin = thin_p, burnin = burnin_p,
+                          verbose = FALSE)
+
+
+
+ld_50_prey_phlyo <- prey_mod_long$VCV[,"traitld50:traitld50.animal"]/
+                    (prey_mod_long$VCV[,"traitld50:traitld50.animal"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.species"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.units"])
+
+ld_50_prey_species <- prey_mod_long$VCV[,"traitld50:traitld50.species"]/
+                    (prey_mod_long$VCV[,"traitld50:traitld50.animal"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.species"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.units"])
+
+ld_50_prey_units <- prey_mod_long$VCV[,"traitld50:traitld50.units"]/
+                    (prey_mod_long$VCV[,"traitld50:traitld50.animal"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.species"] +
+                     prey_mod_long$VCV[,"traitld50:traitld50.units"])
+
+hdr(ld_50_prey_phlyo)
+hdr(ld_50_prey_species)
+hdr(ld_50_prey_units)
+
+
+
+vol_prey_phlyo <-  prey_mod_long$VCV[,"traitvol.v:traitvol.v.animal"]/
+                    (prey_mod_long$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.species"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.units"])
+
+vol_prey_spec <-  prey_mod_long$VCV[,"traitld50:traitvol.v.species"]/
+                    (prey_mod_long$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.species"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.units"])
+
+vol_prey_units <-  prey_mod_long$VCV[,"traitvol.v:traitvol.v.units"]/
+                    (prey_mod_long$VCV[,"traitvol.v:traitvol.v.animal"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.species"] +
+                     prey_mod_long$VCV[,"traitvol.v:traitvol.v.units"])
+
+
+hdr(vol_prey_phlyo)
+hdr(vol_prey_spec)
+hdr(vol_prey_units)
+
+
+
+summary(prey_mod_long)
+```
+
+
+##Predator-prey size allometry
+Model of predator prey allometry.
+
+```{r pred-prey model}
+#if you want to include species and ld50 method as a fixed term.
+prior2<-list(R = list(V = 1, nu=0.002), 
+             G = list(G1=list(V = 1,n = 2, 
+                              alpha.mu= 0, 
+                              alpha.V = 10^3)))
+
+
+######with prey included
+prey_mass_mod <- MCMCglmm(prey_mean ~ 
+                            mass.aa, 
+                          random = ~ animal,
+                          rcov=~units, 
+                          data = mydat.P, 
+                          pedigree = prey.tree, 
+                          prior = prior2, 
+                          family=c("gaussian"), 
+                          nitt = 600000, thin =250, burnin = 100000,
+                          verbose = FALSE)
+
+summary(prey_mass_mod)
+
+```
