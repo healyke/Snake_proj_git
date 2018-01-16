@@ -917,14 +917,8 @@ mydat.P <-mydat.P[mydat.P$species != prey.dropped[i],]
 
 mydat.P <- as.data.frame(as.matrix(mydat.P))
 
-prey_mean <- (log10(as.numeric(as.character(mydat.P$prey_mass))) -
-                mean(log10(as.numeric(as.character(mydat.P$prey_mass)))))
-              /sd(log10(as.numeric(as.character(mydat.P$prey_mass))))
-
-prey_max <- (log10(as.numeric(as.character(mydat.P$prey_max))) -
-               mean(log10(as.numeric(as.character(mydat.P$prey_max)))))
-              /sd(log10(as.numeric(as.character(mydat.P$prey_max))))
-
+prey_mean <- (log10(as.numeric(as.character(mydat.P$prey_mass))) - mean(log10(as.numeric(as.character(mydat.P$prey_mass)))))/
+  sd(log10(as.numeric(as.character(mydat.P$prey_mass))))
 
 
 mydat.P <- data.frame(animal = mydat.P$species, 
@@ -942,8 +936,7 @@ env = factor(mydat.P$env,
 con = mydat.P$con,
 fam = mydat.P$fam,
 mod_class_p = mydat.P$mod_class,
-prey_mean = prey_mean,
-prey_max = prey_max)
+prey_mean = prey_mean)
 
 ```
 
