@@ -1,0 +1,931 @@
+---
+title: "Snake_diet_phylo_dist"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+#Summary
+Here I calulate additional variables using data collated from the litrature and recorded in the csv file "name of file". 
+
+We calulate body mass in grams using snake total lengths and allometric equations at the family level as outlined in Meiri 2010. We also calulate the phylogentic distance between each snake species recorded diet and the model species used to measures its LD50 and weight it based on the proportion of each prey item found in the snakes diet.
+
+
+# Upload stuff
+## Packages
+
+```{r packages}
+
+library(phytools)
+library(caper)
+library(MCMCglmm)
+
+```
+
+## Upload data
+Now upload the data both for the species that you want to test and the species in the diet.
+
+```{r data}
+
+snake_data <- read.csv("Working_snake_data_oct13_2017.csv", sep =",", header = T)
+
+snake_data$phylo_distance_diet_model_my <- -9999
+
+diet_data <-  read.csv("Snake_diet_species_oct_28.csv", sep =",", header = T)
+
+##and some small clean up
+diet_data <- (diet_data[,c("species", 
+                          "prey_species", 
+                          "prop_prey",
+                          "level_identified",
+                          "prey_taxa",
+                          "ld50_model_class",
+                          "ld50_model_sp",
+                          "ld50_model_number",
+                          "match_type")])
+```
+
+## Upload phylogenies
+Now upload the phylogenies. These are big so need to reduce the size
+
+
+```{r phylo upload}
+
+###I need to get the amphibian tree
+
+##
+#load in the rest of the trees
+#mammal_phy <- read.nexus("FritzTree.rs200k.100trees.tre")
+#aves_phy <- read.tree("BirdzillaHackett10.tre")
+
+#Lizard_phy <- read.tree("liz_and_snake_time_tree.txt")
+#this seems to fix a dublicate problem caused by polynomies in the tree
+#lizard_phy<-makeLabel(Lizard_phy)
+#lizard_phy<-makeLabel(lizard_phy)
+
+
+```
+
+# Divergent times for Class
+
+Lets Define the ages between some large class
+
+```{r ages between class}
+
+#go back
+
+## 259-285 Myr from Jones et al.
+bird_rep <- 272
+
+# fossil Archerpeton anthracos (Holotype: RM 12056, Author: 
+# Carroll 1964, Reisz and Müller, Epoch: Westphalian A Canada Nova Scotia, 
+# Age: 318.1 – 314.6 Myr, Dating: International Commission on Stratigraphy 2009). 
+amniote <- 316.35
+
+amh <- 359.2
+
+fish <- 419
+# fossil Guiyu oneiros (Holotype: IVPP V15541, Zhu et al.24, 
+# Epoch: Late Ludlow, Silurian, Kuanti Formation; Qujing, Yunnan, China., 
+#Age: 419 Myr
+
+inverts <- 556.5
+# fossil Kimberella quadrata26 (Holotype: PI 2734, Fedonkin et al.27,
+# Epoch: Ediacarn, Formation; South Australia)
+# Age: 555-558 Myr
+```
+
+Now match up the phylo distances for when the LD50 species and the dietary species in differnt classes. Note that the rowID needs to match up to the most recent dataframe in the loop.
+```{r phylo calulation}
+
+snake_sp <- unique(diet_data$species)
+
+##add extra colunm
+phylo_dist  <- rep(-999, length(diet_data[,1]))
+row_ID <- as.numeric(row.names(diet_data))
+diet_mod <- cbind(diet_data, phylo_dist, row_ID)
+
+for(i in 1:length(snake_sp)){
+
+#pick the first species
+current_snake <- diet_mod[diet_mod$species  == as.vector(snake_sp[i]),]
+
+#how many LD50 model does it have 
+   ld50_no <- max(current_snake$ld50_model_number)
+
+   #loop through each of the ld50 models   
+      for(k in 1:ld50_no){
+        current_snake_ld50 <- current_snake[current_snake$ld50_model_number == k,]
+      #loop through each of the prey items
+        for(j in 1:length(current_snake_ld50[,1])){
+        
+        #only loop through prey ld50 models matched at the class level
+             if(c(as.vector(current_snake_ld50[j,"match_type"]) != "class") == T)
+             {diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- c(-99)}
+               else {
+               
+          #now ask what class match they are starting with mammals
+              if(all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                           as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                    == c("aves", "mammalia")) |
+                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                           as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                    == c("mammalia", "reptile")))
+
+              {diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- amniote
+              
+              }
+                 
+                 else {  
+                  
+                  if(all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                               as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                        == c("amphibian", "mammalia")) |
+                     all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                               as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                        == c("amphibian", "reptile")) |
+                     all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                               as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                        == c("amphibian", "aves"))
+              )
+                  {diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- amh}
+                  
+                        else {  
+                          
+                          if(all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                        as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                 == c("fish", "mammalia")) |
+                             all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                        as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                 == c("fish", "reptile")) |
+                            all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                       as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                 == c("aves", "fish"))|
+                            all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                       as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                 == c("amphibian", "fish"))
+                             )
+                            
+                          {diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- fish}
+                          
+                            else {  
+                          
+                              if(all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("invert", "mammalia")) |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("invert", "aves"))   |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("invert", "reptile"))   |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("invert", "amphibian"))   |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("fish", "invert"))     |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("aves", "invert"))       |
+                                 all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                                            as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                                     == c("amphibian", "invert")) 
+                                 )
+                            
+                            {diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- inverts}
+                                    else{
+                                      if(all(sort(c(as.vector(current_snake_ld50[j,"ld50_model_class"]),
+                           as.vector(current_snake_ld50[j,"prey_taxa"]))) 
+                    == c("aves", "reptile")))
+{diet_mod[current_snake_ld50[j,"row_ID"],"phylo_dist"] <- bird_rep}
+                                  
+                                }
+              
+                            }
+                      }
+                 }
+       
+         } #only loop through prey ld50 models matched at the class level     
+      } #loop through each of the prey items
+   } #loop through each of the ld50 models
+}        
+```
+
+## Sub Class
+
+Now we need to get the phylo distances for the non class matches. First lets sort out the the sub catagories
+
+```{r within class taxa}
+
+for(i in 1:length(diet_mod[,1])){
+             if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                  as.vector(diet_mod[i,"level_identified"]) =="class" &
+                  all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                             as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                      == c("mammalia", "mammalia")))
+                            
+               ##for now we will just take half the evolutionary distance to amniotes
+             {diet_mod[i,"phylo_dist"] <- amniote/2} 
+              
+                    
+                  else {  if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                  as.vector(diet_mod[i,"level_identified"]) =="class" &
+                  all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                             as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                      == c("aves", "aves")))
+                    
+                      ##for now we will just take half the evolutionary distance to amniotes
+             {diet_mod[i,"phylo_dist"] <- amniote/2}
+               
+                          else {  if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                  as.vector(diet_mod[i,"level_identified"]) =="class" &
+                  all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                             as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                      == c("reptile", "reptile")))
+                            
+                      ##for now we will just take half the evolutionary distance to amniotes
+                          {diet_mod[i,"phylo_dist"] <- amniote/2}
+                            
+                                else {  if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                        as.vector(diet_mod[i,"level_identified"]) =="class" &
+                                   all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                                              as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                                       == c("amphibian", "amphibian")))
+                      
+                      ##for now we will just take half the evolutionary distance to amphibains
+                                {diet_mod[i,"phylo_dist"] <- amh/2} 
+                                  
+                                  
+                                      else {  if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                                                 as.vector(diet_mod[i,"level_identified"]) =="class" &
+                                                 all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                                                            as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                                                     == c("fish", "fish")))
+                      
+                      ##for now we will just take half the evolutionary distance to amphibains
+                                      {diet_mod[i,"phylo_dist"] <- fish/2}
+                                        
+                                          else {  if(c(as.vector(diet_mod[i,"match_type"]) == "class") == F &
+                                                  as.vector(diet_mod[i,"level_identified"]) =="class" &
+                                                  all(sort(c(as.vector(current_snake_ld50[i,"ld50_model_class"]),
+                                                              as.vector(current_snake_ld50[i,"prey_taxa"]))) 
+                                                      == c("artropod", "invert")))
+                      
+                      ##for now we will just take half the evolutionary distance to inverts
+                                {diet_mod[i,"phylo_dist"] <- inverts/2}
+                                
+                                  
+                                  
+                                              }
+                                          }
+                                    }
+                              }
+                        }
+             
+}
+
+```
+
+For groups that are more difficult to put in class we match up using time tree manually
+
+```{r indavidual divergant dates}
+
+##Divergance time between Apogonidae and Chromis_sp, Dascyllus, and Istiblennius species as 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Apogonidae","phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between bats and Mus_musculus as 96 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "bat", "phylo_dist"]        <- 96
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Chiroptera","phylo_dist"] <- 96
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pteropodidae_sp","phylo_dist"] <- 96
+
+
+
+##--------------------------
+
+
+##Divergance time between Batrachoididae and Carassius auratus as 229.9 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Batrachoididae", "phylo_dist"] <- 229.9
+##--------------------------
+
+
+##Divergance time between Bufonidae and Rana_sp as 155 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Bufonidae", "phylo_dist"] <- 155
+##--------------------------
+
+
+##Divergance time between Carangidae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Carangidae", "phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between Clupeidae and Chromis_sp, Dascyllus, and Istiblennius 229.9 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Clupeidae", "phylo_dist"] <- 229.9
+##--------------------------
+
+
+##Divergance time between Engraulidae and Chromis_sp, Dascyllus, and Istiblennius 229.9 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Engraulidae", "phylo_dist"] <- 229.9
+##--------------------------
+
+
+##Divergance time between Labridae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Labridae", "phylo_dist"] <- 128
+##--------------------------
+
+##Divergance time between Lutjanidae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Lutjanidae", "phylo_dist"] <- 128
+##--------------------------
+
+##Divergance time between marsupial_bandicoot and Mus_musculus 159 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "marsupial_bandicoot", "phylo_dist"] <- 159
+##--------------------------
+
+
+##Common ancestor for Muridae is 43 - 49mys from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Muridae", "phylo_dist"] <- 46
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Muridae_sp", "phylo_dist"] <- 46
+##--------------------------
+
+
+##Divergance time between Opisthognathidae and Carassius_auratus 229.9 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Opisthognathidae", "phylo_dist"] <- 229.9
+##--------------------------
+
+
+##Divergance time between Pempheridae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pempheridae", "phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between Pomacentridae and Istiblennius 96 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pomacentridae" & diet_mod$ld50_model_sp == "Istiblennius_meleagris", "phylo_dist"] <- 96
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pomacentridae" & diet_mod$ld50_model_sp == "Istiblennius_edentulus", "phylo_dist"] <- 96
+##--------------------------
+
+
+##Divergance time between Pomacentridae and Chromis_sp, Dascyllus using Ovalentaria incertae sedis as Pomacentridae ancestral node at 91 - 117 MYA using http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pomacentridae" & diet_mod$ld50_model_sp == "Chromis_nitida", "phylo_dist"] <- 104
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pomacentridae" & diet_mod$ld50_model_sp == "Chromis_atripectoralis", "phylo_dist"] <- 104
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Pomacentridae" & diet_mod$ld50_model_sp == "Dascylhus_aruanus", "phylo_dist"] <- 104
+##--------------------------
+
+#Divergance time for rodents for anything between Mus_musculus and unidentified rodents. Used Glires as common ancestoer data at 82mya from http://www.timetree.org 
+
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Rodents", "phylo_dist"] <- 82 
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "rodents", "phylo_dist"] <- 82 
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Rodentia", "phylo_dist"] <- 82 
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Rodent", "phylo_dist"] <- 82 
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Undetermined_rodents", "phylo_dist"] <- 82 
+
+##--------------------------
+
+
+##Divergance time between Scaridae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Scaridae", "phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between Sciuridae and Mus_musculus 70 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Sciuridae", "phylo_dist"] <- 70
+##--------------------------
+
+
+##Divergance time between Scorpaenidae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Scorpaenidae", "phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between Scorpion and Schistocerca_gregaria 569 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Scorpion" & diet_mod$ld50_model_sp == "Schistocerca_gregaria", "phylo_dist"] <- 569
+##--------------------------
+
+##Divergance time between Scorpion and Scorpio_maurus 494 mya using estimated time of Arachnida common ancestor from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Scorpion" & diet_mod$ld50_model_sp == "Schistocerca_gregaria", "phylo_dist"] <- 494
+##--------------------------
+
+
+##Divergance time between Serranidae and Chromis_sp, Dascyllus, and Istiblennius 128 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Serranidae", "phylo_dist"] <- 128
+##--------------------------
+
+
+##Divergance time between Shrews_sp, shrew and Mus_musculus, Rattus_sp, Oryctolagus_cuniculus and Cavia_porcellus 96 mya using estimated time from http://www.timetree.org
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Shrews_sp", "phylo_dist"] <- 96
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "shrew", "phylo_dist"] <- 96
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Soricidae_sp", "phylo_dist"] <- 96
+##--------------------------
+
+
+
+#Divergance between Cricetidae and Mus_musculus is a rodent family and is a prey item of Hydrodynastes_gigas. Estimated 32.7mya from time tree
+
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Cricetidae", "phylo_dist"] <- 32.7
+
+
+
+# Muridea common ancestor for between Rattus_sp and Rattus_Rattus from Timetree
+
+diet_mod[diet_mod$level_identified == "sp_genus" & 
+         diet_mod$prey_species == "Rattus_rattus",
+         "phylo_dist"] <- 22.0
+
+
+#divergant times are between Rattus_sp and Lemniscomys_striatus 
+#estimated timetree
+
+diet_mod[diet_mod$level_identified == "sp_genus" & 
+         diet_mod$prey_species == "Lemniscomys_striatus",
+         "phylo_dist"] <- 20.9
+
+
+#divergant times are between Rattus and Cricetomys_gambianus
+#estimated timetree
+diet_mod[diet_mod$level_identified == "sp_genus" & 
+         diet_mod$prey_species == "Cricetomys_gambianus",
+         "phylo_dist"] <- 33.0
+
+#divergant times are between Rattus and Funisciurus_sp
+#estimated timetree
+diet_mod[diet_mod$level_identified == "sp_genus" & 
+         diet_mod$prey_species == "Funisciurus_sp",
+         "phylo_dist"] <- 71
+
+#divergant times are between Rattus and Funisciurus_sp
+#estimated timetree
+diet_mod[diet_mod$level_identified == "sp_genus" & 
+         diet_mod$prey_species == "Heliosciurus_sp",
+         "phylo_dist"] <- 71
+
+#divergant times are between Dasyurid_sp and Mus musculus
+#estimated timetree
+diet_mod[diet_mod$level_identified == "sub_class" & 
+         diet_mod$prey_species == "Dasyuridae",
+         "phylo_dist"] <- 159
+
+```
+
+## Mammals
+# Species
+Now species level matching for Mammals. First we check if all the species are in the right databases.
+
+```{r check if mammal species are in phylogeny}
+
+diet_mod[,"prey_species"] <- as.vector(as.character(diet_mod[,"prey_species"]))
+
+###I changed Perognathus_baileyi to Chaetodipus_baileyi
+diet_mod[diet_mod$match_type == "mammalia" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Perognathus_baileyi"
+         ,"prey_species" ] <- "Chaetodipus_baileyi"
+
+
+###I changed Perognathus_penicillatus to Chaetodipus_penicillatus
+diet_mod[diet_mod$match_type == "mammalia" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Perognathus_penicillatus"
+         ,"prey_species" ] <- "Chaetodipus_penicillatus"
+
+###I changed Reithrodontomnyms_egalotis to Reithrodontomys_megalotis
+diet_mod[diet_mod$match_type == "mammalia" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Reithrodontomnyms_egalotis"
+         ,"prey_species" ] <- "Reithrodontomys_megalotis"
+
+diet_mod[,"prey_species"] <- as.factor(diet_mod[,"prey_species"])
+
+
+mammal_diet_sp <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "species"
+                           ,"prey_species" ]
+
+mammal_ld50_sp <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "species"
+                           ,"ld50_model_sp" ]
+
+mam_row_ID <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "species"
+                           ,"row_ID" ]
+
+mammal_all <- unique(c(as.vector(mammal_diet_sp),as.vector(mammal_ld50_sp)))
+mammal_all <- data.frame(species  = mammal_all,
+                         species_check  = mammal_all)
+
+mammal_data_phy <- comparative.data(mammal_phy[[1]],mammal_all , species_check)
+mammal_data_phy$dropped$unmatched.rows
+
+
+```
+
+And match up using the phylogeny for species level
+
+```{r species level match}
+
+for(i in mam_row_ID){
+  
+  diet_mod[i, "phylo_dist"] <- 
+    
+    cophenetic(mammal_phy[[1]])[as.character(diet_mod[i, "prey_species"]), 
+                                as.character(diet_mod[i, "ld50_model_sp"])]
+
+}
+
+```
+
+##Genus
+Now to match up species
+
+```{r check if mammal genus is phylogeny}
+
+#####mammals
+mammal_diet_genus <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "genus"
+                           ,"prey_species" ]
+
+mammal_ld50_genus <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "genus"
+                           ,"ld50_model_sp" ]
+
+mam_row_ID_genus <- diet_mod[diet_mod$match_type == "mammalia" 
+                           & diet_mod$level_identified == "genus"
+                           ,"row_ID" ]
+
+mammal_diet_sub <- gsub("_sp","",mammal_diet_genus)
+
+mammal_genus_sister <- vector()
+for(i in 1:length(mammal_diet_sub)){
+  
+  mammal_genus_sister[i] <- mammal_phy[[1]]$tip.label[grep(mammal_diet_sub[i], mammal_phy[[1]]$tip.label)][1]
+}
+
+
+mammal_all_genus <- data.frame(mammal_genus_sister,
+                               mammal_diet_genus,
+                               mammal_ld50_genus)
+
+
+
+```
+
+And match up using the phylogeny for species level
+
+```{r mammal genus match}
+
+for(i in 1:length(mammal_all_genus[,1])){
+  
+ diet_mod[mam_row_ID_genus[i], "phylo_dist"] <- 
+    
+    cophenetic(mammal_phy[[1]])[as.character(mammal_all_genus[i, "mammal_genus_sister"]), 
+                                as.character(mammal_all_genus[i, "mammal_ld50_genus"])]
+  
+}
+
+
+```
+
+
+#Reptiles
+# Species
+The same for reptiles but with a lot more synonms
+
+```{r input reptile species distance}
+
+##reptiles
+#need to change to 
+diet_mod[,"prey_species"] <- as.vector(as.character(diet_mod[,"prey_species"]))
+
+##I changed Amphisbaena_dubia, Amphisbaena_mensae and Leposternon_wuchereri to Amphisbaena_anaemariae as its the furtest divergabce time from Amphisbaena_cunhai and so is a conservative estimate for the species that are not in the tree
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Amphisbaena_dubia"
+         ,"prey_species" ] <- "Amphisbaena_anaemariae"
+
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Amphisbaena_mensae"
+         ,"prey_species" ] <- "Amphisbaena_anaemariae"
+
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Leposternon_wuchereri"
+         ,"prey_species" ] <- "Amphisbaena_anaemariae"
+
+
+##I changed Tantilla_relicta, Tantilla_coronata to Coluber_zebrinus.
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Tantilla_relicta"
+         ,"prey_species"] <- "Coluber_zebrinus"
+
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Tantilla_coronata"
+         ,"prey_species"] <- "Coluber_zebrinus"
+
+
+
+###I changed Eumeces_inexpectatus to Plestiodon_inexpectatus
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Eumeces_inexpectatus"
+         ,"prey_species" ] <- "Plestiodon_inexpectatus"
+
+
+###I changed Liotyphlops_wilderi to Liotyphlops_albirostris
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Liotyphlops_wilderi"
+         ,"prey_species" ] <- "Liotyphlops_albirostris"
+
+
+###I changed Neoseps_reynoldsi to Plestiodon_reynoldsi
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Neoseps_reynoldsi"
+         ,"prey_species" ] <- "Plestiodon_reynoldsi"
+
+
+###I changed Scincella_laterale to Scincella_lateralis
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Scincella_laterale"
+         ,"prey_species" ] <- "Scincella_lateralis"
+
+
+###I changed Elaphe_abacura to Farancia_abacura
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Elaphe_abacura"
+         ,"prey_species" ] <- "Farancia_abacura"
+
+
+###I changed Stilosoma_extenuatum to Lampropeltis_extenuata
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "species" & diet_mod$prey_species == "Stilosoma_extenuatum"
+         ,"prey_species" ] <- "Lampropeltis_extenuata"
+
+
+
+diet_mod[,"prey_species"] <- as.factor(diet_mod[,"prey_species"])
+
+###get the row id so its easier to loop
+rep_row_ID <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "species"
+                           ,"row_ID" ]
+
+rep_diet_sp <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "species"
+                           ,"prey_species" ]
+
+rep_ld50_sp <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "species"
+                           ,"ld50_model_sp" ]
+
+rep_all <- unique(c(as.vector(rep_diet_sp),as.vector(rep_ld50_sp)))
+rep_all <- data.frame(species  = rep_all, species_check  = rep_all)
+
+rep_data_phy <- comparative.data(lizard_phy,rep_all , species_check)
+rep_data_phy$dropped$unmatched.rows
+
+```
+
+Loop throught the reptiles speces
+
+```{r }
+
+for(i in rep_row_ID){
+  
+  diet_mod[i, "phylo_dist"] <- 
+    
+    cophenetic(lizard_phy)[as.character(diet_mod[i, "prey_species"]), 
+                                as.character(diet_mod[i, "ld50_model_sp"])]
+
+}
+
+
+```
+
+
+# Genus
+
+```{r check if rep genus is phylogeny}
+
+diet_mod[,"prey_species"] <- as.vector(as.character(diet_mod[,"prey_species"]))
+
+###I changed Scincella_laterale to Cercosaura
+diet_mod[diet_mod$match_type == "reptile" 
+         & diet_mod$level_identified == "genus" & diet_mod$prey_species == "Pantodactylus_sp"
+         ,"prey_species" ] <- "Cercosaura_sp"
+
+diet_mod[,"prey_species"] <- as.factor(diet_mod[,"prey_species"])
+
+
+rep_diet_genus <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "genus"
+                           ,"prey_species" ]
+
+rep_ld50_genus <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "genus"
+                           ,"ld50_model_sp" ]
+
+rep_row_ID_genus <- diet_mod[diet_mod$match_type == "reptile" 
+                           & diet_mod$level_identified == "genus"
+                           ,"row_ID" ]
+
+rep_diet_sub <- gsub("_sp","",rep_diet_genus)
+
+rep_genus_sister <- vector()
+for(i in 1:length(rep_diet_sub)){
+  
+  rep_genus_sister[i] <- lizard_phy$tip.label[grep(rep_diet_sub[i], lizard_phy$tip.label)][1]
+}
+
+
+rep_all_genus <- data.frame(rep_genus_sister,
+                               rep_diet_genus,
+                               rep_ld50_genus)
+
+
+```
+
+And match up using the phylogeny for species level
+
+```{r rep genus match}
+
+for(i in 1:length(rep_all_genus[,1])){
+  
+ diet_mod[rep_row_ID_genus[i], "phylo_dist"] <- 
+    
+    cophenetic(lizard_phy)[as.character(rep_all_genus[i, "rep_genus_sister"]), 
+                                as.character(rep_all_genus[i, "rep_ld50_genus"])]
+  
+}
+
+
+```
+
+#Aves
+```{r input aves species distance}
+
+
+###get the row id so its easier to loop
+aves_row_ID <- diet_mod[diet_mod$match_type == "aves" 
+                           & diet_mod$level_identified == "species"
+                           ,"row_ID" ]
+
+aves_diet_sp <- diet_mod[diet_mod$match_type == "aves" 
+                           & diet_mod$level_identified == "species"
+                           ,"prey_species" ]
+
+aves_ld50_sp <- diet_mod[diet_mod$match_type == "aves" 
+                           & diet_mod$level_identified == "species"
+                           ,"ld50_model_sp" ]
+
+aves_all <- unique(c(as.vector(aves_diet_sp),as.vector(aves_ld50_sp)))
+aves_all <- data.frame(species  = aves_all, species_check  = aves_all)
+
+aves_data_phy <- comparative.data(aves_phy[[1]],aves_all , species_check)
+rep_data_phy$dropped$unmatched.rows
+
+
+###I need to uplaod the tree
+
+```
+
+Loop throught the aves speces
+
+```{r }
+
+for(i in aves_row_ID){
+  
+  diet_mod[i, "phylo_dist"] <- 
+    
+    cophenetic(aves_phy[[1]])[as.character(diet_mod[i, "prey_species"]), 
+                                as.character(diet_mod[i, "ld50_model_sp"])]
+
+}
+
+
+```
+
+
+
+
+#Amphibians
+```{r input amphibian species distance}
+
+diet_mod[,"prey_species"] <- as.factor(diet_mod[,"prey_species"])
+
+#Divergance time of 155mya from Amietophrynus_rangeri and Rana_sp
+amp_diet_sp <- diet_mod[diet_mod$match_type == "amphibian" 
+                           & diet_mod$level_identified == "species"
+                           ,"phylo_dist" ] <- 155
+
+
+```
+
+
+# Fish
+```{r input fish species distance}
+
+diet_mod[,"prey_species"] <- as.factor(diet_mod[,"prey_species"])
+
+###from time tree
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Callichthys_callichthys" & diet_mod$ld50_model_sp == "Gymnotus_carapo", "phylo_dist"] <- 150
+
+###same species
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Gymnotus_carapo" & diet_mod$ld50_model_sp == "Gymnotus_carapo", "phylo_dist"] <- 0
+
+###from time tree
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Synbranchus_marmoratus" & diet_mod$ld50_model_sp == "Gymnotus_carapo", "phylo_dist"] <- 229.9
+
+###from time tree
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Callichthys_callichthys" & diet_mod$ld50_model_sp == "Synbranchus_marmoratus", "phylo_dist"] <- 229.9
+
+###from time tree
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Gymnotus_carapo" & diet_mod$ld50_model_sp == "Synbranchus_marmoratus", "phylo_dist"] <- 229.9
+
+###from time tree
+diet_mod[diet_mod$match_type != "class" & diet_mod$prey_species == "Synbranchus_marmoratus" & diet_mod$ld50_model_sp == "Synbranchus_marmoratus", "phylo_dist"] <- 0
+
+
+
+```
+
+
+###Add up the proportions
+
+I need to loop through the species properly
+```{r proportions}
+
+phylo_sum <- list()
+phylo_diet <- list()
+phylo_ld50 <- list()
+phylo_snake_sp <- list()
+
+  tryCatch({
+   
+for(i in 1:length(snake_sp)){
+
+current_snake <- diet_mod[diet_mod$species  == as.vector(snake_sp[i]),]
+
+#how many LD50 model does it have 
+   ld50_no <- max(current_snake$ld50_model_number)
+   #loop through each of the ld50 models   
+      for(k in 1:ld50_no){
+         
+        
+         phylo_sum_temp <- sum(current_snake[current_snake$species == current_snake$species &
+                                      current_snake$ld50_model_number == k,
+                                      "phylo_dist"]*
+                               as.numeric(as.vector(current_snake[current_snake$species ==
+                                      current_snake$species &
+                                      current_snake$ld50_model_number == k,
+                                      "prop_prey"])))
+
+         phylo_ld50_sp_temp <-      as.vector(current_snake[current_snake$species ==
+                                      current_snake$species &
+                                      current_snake$ld50_model_number == k,
+                                      "ld50_model_sp"])[1]
+
+         phylo_snake_sp_temp <-      as.vector(current_snake[current_snake$species ==
+                                      current_snake$species &
+                                      current_snake$ld50_model_number == k,
+                                      "species"])[1]
+
+
+         phylo_snake_sp[[as.vector(current_snake$species[1])]][k] <- phylo_snake_sp_temp
+         phylo_sum[[as.vector(current_snake$species[1])]][k] <- phylo_sum_temp
+         phylo_ld50[[as.vector(current_snake$species[1])]][k] <- phylo_ld50_sp_temp
+
+         
+      }
+
+   }
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+
+
+phylo_frame <- data.frame(snakes_sp = unlist(phylo_snake_sp), 
+                          phylo_sum = unlist(phylo_sum), 
+                          phylo_ld50 = unlist(phylo_ld50))
+
+```
+
+
+And now to graft this data into the main datasheet
+
+```{r}
+
+snake_data[,"phylo_distance_diet_model_my"] <- -9999
+  tryCatch({
+
+for(i in 1:length(snake_data[,1])){
+
+  if(any(phylo_frame$snakes_sp == as.vector(snake_data$species[i])) == T &
+     any(phylo_frame$phylo_ld50 == as.vector(snake_data$ld50_model[i])) == T) {
+  
+  snake_data[i,"phylo_distance_diet_model_my"] <- phylo_frame[phylo_frame$snakes_sp ==
+                                                              as.vector(snake_data$species[i]) 
+                                                              &
+                                                              phylo_frame$phylo_ld50 ==
+                                                              as.vector(snake_data$ld50_model[i]),
+                                                              "phylo_sum"]
+
+  }
+  
+  else { snake_data[i,"phylo_distance_diet_model_my"] <- -666}
+  
+  }
+  }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+
+```
+

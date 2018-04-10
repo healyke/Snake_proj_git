@@ -3,9 +3,13 @@ title: "Snake_venom_analysis"
 author: "Kevin Healy"
 date: "15 Jan  2018"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
+
+
+# Upload stuff
+This script goes through the analysis of the data after calulating the body mass and phylogentic distance between the diet and LD50 model.
 
 
 # Upload stuff
@@ -13,7 +17,7 @@ output:
 
 First the required packages are uplaoded. These include .MCMCglmm' which is used for the main linear analysis, 'phytools' and 'caper'. to handle the phylogenies and finaly 'hdrcde', 'wesanderson' and the 'MultiDisPlot.R' function to make some of the plots.
 
-```{r packages}
+```{r packages, tidy = TRUE, results = "hide"}
 
 library(phytools)
 library(caper)
@@ -28,7 +32,7 @@ source("MultiDisPlot.R")
 Next we uplaod the main data file. See the methods section in the main paper for a description of the data.
 
 ```{r data}
-ld50_data <- read.csv("S2_snake_data.csv",header=T,sep=",")
+ld50_data <- read.csv("S2_snake_data_5_april.csv",header=T,sep=",")
 
 ```
 
@@ -49,9 +53,6 @@ To allow for comparison of effect sizes we log transform all continous variables
 ```{r transform}
 
 ld50_clean  <- ld50_data
-#length
-len.v <- log10(ld50_clean$length_cm)
-len.v <- (len.v - mean(len.v))/(sd(len.v))
 
 #mass
 mass <- log10(ld50_clean $mass_grams)

@@ -1,0 +1,672 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\hypersetup{unicode=true,
+            pdftitle={Snake\_mev\_analysis},
+            pdfauthor={Kevin Healy},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\newcommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+  \title{Snake\_mev\_analysis}
+  \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \author{Kevin Healy}
+  \preauthor{\centering\large\emph}
+  \postauthor{\par}
+  \predate{\centering\large\emph}
+  \postdate{\par}
+  \date{05/04/2018}
+
+
+\begin{document}
+\maketitle
+
+\section{Summary}\label{summary}
+
+This script runs the model which includes error associated with the
+measurement of LD50 values were this information is reported.
+
+\section{Upload stuff}\label{upload-stuff}
+
+\subsection{Packages}\label{packages}
+
+First the required packages are uploaded. These include .MCMCglmm' which
+is used for the main linear analysis, `phytools' and `caper'. to handle
+the phylogenies and finally `hdrcde', `wesanderson' and the
+`MultiDisPlot.R' function to make some of the plots.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(phytools)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: ape
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: maps
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(caper)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: MASS
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: mvtnorm
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(MCMCglmm)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: Matrix
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'Matrix'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:phytools':
+## 
+##     expm
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: coda
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{library}\NormalTok{(wesanderson)}
+\KeywordTok{library}\NormalTok{(hdrcde)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## This is hdrcde 3.2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{source}\NormalTok{(}\StringTok{"MultiDisPlot.R"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{data}\label{data}
+
+Next we upload the main data file. Only species which had a reported
+mean yield measure, an LD50 measure and diet with prey item proportions
+were included. See the methods section in the main paper for a
+description of the data.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ld50_data <-}\StringTok{ }\KeywordTok{read.csv}\NormalTok{(}\StringTok{"S2_snake_data_5_april.csv"}\NormalTok{,}\DataTypeTok{header=}\NormalTok{T,}\DataTypeTok{sep=}\StringTok{","}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Phylogeny}\label{phylogeny}
+
+We use the phylogeny from Pyron et al 2014 to control for phylogeny in
+our main model.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tree <-}\StringTok{ }\KeywordTok{read.tree}\NormalTok{(}\StringTok{"liz_and_snake_time_tree.txt"}\NormalTok{)}
+\CommentTok{#this seems to fix a dublicate problem caused by polynomies in the tree}
+\NormalTok{Tree<-}\KeywordTok{makeLabel}\NormalTok{(tree)}
+\NormalTok{Tree<-}\KeywordTok{makeLabel}\NormalTok{(Tree)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Convert each value into a standard error
+term}\label{convert-each-value-into-a-standard-error-term}
+
+We collated measures of error associated with LD50 values when reported.
+All error measures associated with LD50 values were converted to
+standard error for inclusion as a measurement error term using the
+\texttt{mev} term in the \texttt{MCMCglmm} model. Where errors were
+reported as confidence intervals (Ci) they were log transformed, to
+correspond with the log transformation of the reposne variable, and
+converted using \$SE = (u - 95\% lower Ci)/1.96 or \$SE = (u - 99\%
+lower Ci)/2.58. For 5\% Fiducial limits we treat these as confidence
+intervals and for ranges we treat these as 99\% confidence intervals.
+Were Standard deviations are given we use the total number of mice given
+as the sample size to first convert it into a 95\% Ci for log
+trasnformation and then to SE as above.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{se_error <-}\StringTok{ }\KeywordTok{vector}\NormalTok{()}
+
+\ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\KeywordTok{length}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_error))\{}
+  
+   \CommentTok{#95% credability interval}
+  \ControlFlowTok{if}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{Error_type[i] }\OperatorTok{==}\StringTok{  "95_confidence_interval"}\NormalTok{) }
+\NormalTok{    \{se_error[i] <-}\StringTok{  }\NormalTok{((}\KeywordTok{log10}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_mg[i]) }\OperatorTok{-}\StringTok{ }\KeywordTok{log10}\NormalTok{(}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{gsub}\NormalTok{(}\StringTok{"-.*"}\NormalTok{, }\StringTok{""}\NormalTok{, ld50_data}\OperatorTok{$}\NormalTok{ld50_error[i])))) }\OperatorTok{/}\StringTok{ }\FloatTok{1.96}\NormalTok{)\}}
+
+  \CommentTok{#Standard deviation will be left as is unless I can get the number of samples}
+    \ControlFlowTok{else}\NormalTok{\{  }\ControlFlowTok{if}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{Error_type[i] }\OperatorTok{==}\StringTok{  "sd"}\NormalTok{) }
+\NormalTok{    \{lower95_temp <-}\StringTok{ }\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_mg[i] }\OperatorTok{-}\StringTok{ }\NormalTok{((}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{gsub}\NormalTok{(}\StringTok{"-.*"}\NormalTok{, }\StringTok{""}\NormalTok{, ld50_data}\OperatorTok{$}\NormalTok{ld50_error[i])))}\OperatorTok{*}\FloatTok{1.96}\NormalTok{)}\OperatorTok{/}\NormalTok{(}\DecValTok{4}\OperatorTok{^}\FloatTok{0.5}\NormalTok{))}
+      
+\NormalTok{      se_error[i] <-}\StringTok{  }\NormalTok{((}\KeywordTok{log10}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_mg[i]) }\OperatorTok{-}\StringTok{ }\KeywordTok{log10}\NormalTok{(lower95_temp)) }\OperatorTok{/}\StringTok{ }\FloatTok{1.96}\NormalTok{)\}}
+    
+  \CommentTok{#for range lets assume a 99% range and a z-value of 2.58}
+          \ControlFlowTok{else}\NormalTok{\{  }\ControlFlowTok{if}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{Error_type[i] }\OperatorTok{==}\StringTok{  "max_min"} \OperatorTok{|}\StringTok{ }\NormalTok{ld50_data}\OperatorTok{$}\NormalTok{Error_type[i] }\OperatorTok{==}\StringTok{  "range"}\NormalTok{) }
+\NormalTok{  \{se_error[i] <-}\StringTok{  }\NormalTok{((}\KeywordTok{log10}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_mg[i]) }\OperatorTok{-}\StringTok{ }\KeywordTok{log10}\NormalTok{(}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{gsub}\NormalTok{(}\StringTok{"-.*"}\NormalTok{, }\StringTok{""}\NormalTok{, ld50_data}\OperatorTok{$}\NormalTok{ld50_error[i])))) }\OperatorTok{/}\StringTok{ }\FloatTok{2.58}\NormalTok{)\}}
+    
+  \CommentTok{#for Fiducial limits we treat them as confidence intervals}
+                   \ControlFlowTok{else}\NormalTok{\{  }\ControlFlowTok{if}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{Error_type[i] }\OperatorTok{==}\StringTok{  "5% Fiducial limits"}\NormalTok{) }
+\NormalTok{  \{se_error[i] <-}\StringTok{  }\NormalTok{((}\KeywordTok{log10}\NormalTok{(ld50_data}\OperatorTok{$}\NormalTok{ld50_mg[i]) }\OperatorTok{-}\StringTok{ }\KeywordTok{log10}\NormalTok{(}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{gsub}\NormalTok{(}\StringTok{"-.*"}\NormalTok{, }\StringTok{""}\NormalTok{, ld50_data}\OperatorTok{$}\NormalTok{ld50_error[i])))) }\OperatorTok{/}\StringTok{ }\FloatTok{1.96}\NormalTok{)\}}
+       
+                     
+                                        \ControlFlowTok{else}\NormalTok{\{ se_error[i] <-}\StringTok{ }\OtherTok{NA}
+    
+                                    
+\NormalTok{        \}     }
+\NormalTok{      \}}
+\NormalTok{    \}}
+\NormalTok{  \} }
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: NAs introduced by coercion
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{se_error[}\KeywordTok{which}\NormalTok{(}\KeywordTok{is.na}\NormalTok{(se_error))] <-}\StringTok{  }\KeywordTok{max}\NormalTok{(}\KeywordTok{na.omit}\NormalTok{(se_error))}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Data transformation}\label{data-transformation}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ld50_clean  <-}\StringTok{ }\NormalTok{ld50_data}
+
+\CommentTok{#mass}
+\NormalTok{mass <-}\StringTok{ }\KeywordTok{log10}\NormalTok{(ld50_clean }\OperatorTok{$}\NormalTok{mass_grams)}
+
+\NormalTok{animal <-}\StringTok{ }\NormalTok{ld50_clean }\OperatorTok{$}\NormalTok{species}
+\NormalTok{species <-}\StringTok{ }\NormalTok{ld50_clean }\OperatorTok{$}\NormalTok{species}
+
+\NormalTok{##volume}
+\NormalTok{vol.v <-}\StringTok{ }\KeywordTok{log10}\NormalTok{(}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{as.vector}\NormalTok{(ld50_clean }\OperatorTok{$}\NormalTok{venom_yield_mg)))}
+
+\CommentTok{#dimension}
+\NormalTok{dimensions <-}\StringTok{ }\NormalTok{ld50_clean }\OperatorTok{$}\NormalTok{dimensions}
+
+\CommentTok{#LD50}
+\NormalTok{ld50_mg <-}\StringTok{ }\KeywordTok{log10}\NormalTok{(}\KeywordTok{as.vector}\NormalTok{(ld50_clean }\OperatorTok{$}\NormalTok{ld50_mg))}
+
+\NormalTok{ld50_method <-}\StringTok{ }\NormalTok{ld50_clean }\OperatorTok{$}\NormalTok{ld50_method}
+
+\NormalTok{##This just checks if eggs were rcorded within the diet.}
+\NormalTok{eggs <-}\StringTok{ }\NormalTok{ld50_clean[,}\KeywordTok{c}\NormalTok{(}\StringTok{"eggs"}\NormalTok{)] }
+\NormalTok{egg.bin <-}\StringTok{ }\KeywordTok{rep}\NormalTok{(}\DecValTok{0}\NormalTok{,}\KeywordTok{length}\NormalTok{(eggs))}
+
+\ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\NormalTok{(}\KeywordTok{length}\NormalTok{(eggs)))\{}
+\ControlFlowTok{if}\NormalTok{(ld50_clean[i,}\KeywordTok{c}\NormalTok{(}\StringTok{"eggs"}\NormalTok{)] }\OperatorTok{>}\StringTok{ }\DecValTok{0}\NormalTok{) egg.bin[i] <-}\StringTok{ "yes"}
+\ControlFlowTok{else}\NormalTok{ egg.bin[i] <-}\StringTok{ "no"}
+\NormalTok{\}}
+
+
+\NormalTok{##This is the weigethed evolutionary distance between prey and diet.}
+\NormalTok{weigted.dist.v <-}\StringTok{ }\NormalTok{(ld50_clean}\OperatorTok{$}\NormalTok{phylo_distance_diet_model_my)}\OperatorTok{/}\DecValTok{100}
+
+\NormalTok{##the species habitat}
+\NormalTok{env <-}\StringTok{ }\NormalTok{ld50_clean}\OperatorTok{$}\NormalTok{environment}
+
+\NormalTok{##whether they constrict}
+\NormalTok{con <-}\StringTok{ }\NormalTok{ld50_clean}\OperatorTok{$}\NormalTok{constriction}
+
+\NormalTok{##the taxinomic family of the species}
+\NormalTok{fam <-}\StringTok{ }\NormalTok{ld50_clean}\OperatorTok{$}\NormalTok{family}
+
+\NormalTok{##the class of the model used to measure LD50}
+\NormalTok{mod_class <-}\StringTok{ }\NormalTok{ld50_clean}\OperatorTok{$}\NormalTok{ld50_model_class}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{full model}\label{full-model}
+
+Now we set up the model to insure that there is a corresponding animal
+column within the data frame in order for the phylogeny to match up. We
+also include as separate ``species'' term to account for variation
+associated with multiple measures for a single species.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{###full model variables that we want with NA's removed}
+\NormalTok{mydat.max <-}\StringTok{ }\KeywordTok{na.omit}\NormalTok{(}\KeywordTok{data.frame}\NormalTok{(animal, }
+\NormalTok{                        species, }
+\NormalTok{                        mass, }
+                        \DataTypeTok{weigted.dist.v =}\NormalTok{ weigted.dist.v, }
+                        \DataTypeTok{dimensions =}\NormalTok{ dimensions, }
+                        \DataTypeTok{ld50 =}\NormalTok{ ld50_mg, }
+\NormalTok{                        ld50_method, }
+\NormalTok{                        dimensions, }
+\NormalTok{                        egg.bin, }
+\NormalTok{                        env, }
+\NormalTok{                        con, }
+\NormalTok{                        fam,}
+\NormalTok{                        mod_class,}
+                        \DataTypeTok{se_error =} \KeywordTok{as.vector}\NormalTok{(se_error)))}
+
+
+\NormalTok{###create a dummy variable of just the species we have to prune the phylogeny}
+\NormalTok{spec_dropped <-}\KeywordTok{as.data.frame}\NormalTok{(}\KeywordTok{matrix}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DataTypeTok{nrow =} \KeywordTok{c}\NormalTok{(}\KeywordTok{length}\NormalTok{(}\KeywordTok{unique}\NormalTok{(mydat.max[,}\StringTok{"species"}\NormalTok{]))), }
+                                    \DataTypeTok{ncol =} \KeywordTok{c}\NormalTok{(}\DecValTok{2}\NormalTok{), }\DataTypeTok{dimnames =} \KeywordTok{list}\NormalTok{(}\KeywordTok{c}\NormalTok{(),}\KeywordTok{c}\NormalTok{(}\StringTok{"species"}\NormalTok{,}\StringTok{"dummy"}\NormalTok{))))}
+\NormalTok{spec_dropped[,}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{unique}\NormalTok{(mydat.max}\OperatorTok{$}\NormalTok{species)}
+\NormalTok{spec_dropped[,}\DecValTok{2}\NormalTok{] <-}\StringTok{ }\KeywordTok{rep}\NormalTok{(}\DecValTok{0}\NormalTok{,}\DataTypeTok{length =} \KeywordTok{c}\NormalTok{(}\KeywordTok{length}\NormalTok{(}\KeywordTok{unique}\NormalTok{(mydat.max[,}\StringTok{"species"}\NormalTok{]))))}
+\NormalTok{spec_dropped <-}\StringTok{ }\KeywordTok{as.data.frame}\NormalTok{(spec_dropped)}
+
+\NormalTok{max.dat <-}\StringTok{ }\KeywordTok{comparative.data}\NormalTok{(}\DataTypeTok{data=}\NormalTok{ spec_dropped, }
+                            \DataTypeTok{phy=}\NormalTok{ Tree, }
+                            \DataTypeTok{names.col=}\StringTok{"species"}\NormalTok{, }
+                            \DataTypeTok{vcv=}\OtherTok{FALSE}\NormalTok{)}
+\NormalTok{max.tree <-}\StringTok{ }\KeywordTok{chronoMPL}\NormalTok{(max.dat}\OperatorTok{$}\NormalTok{phy)}
+
+
+\NormalTok{max.dropped <-}\StringTok{ }\NormalTok{max.dat}\OperatorTok{$}\NormalTok{dropped}\OperatorTok{$}\NormalTok{unmatched.rows}
+
+\NormalTok{mydat.MAX <-}\StringTok{ }\NormalTok{mydat.max}
+\ControlFlowTok{if}\NormalTok{((}\KeywordTok{length}\NormalTok{(max.dropped) }\OperatorTok{>}\StringTok{ }\KeywordTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{)) }\OperatorTok{==}\StringTok{ }\OtherTok{TRUE}\NormalTok{)\{}
+\ControlFlowTok{for}\NormalTok{(i }\ControlFlowTok{in} \DecValTok{1}\OperatorTok{:}\NormalTok{(}\KeywordTok{length}\NormalTok{(max.dropped)))\{}
+\NormalTok{mydat.MAX <-mydat.MAX[mydat.MAX}\OperatorTok{$}\NormalTok{species }\OperatorTok{!=}\StringTok{ }\NormalTok{max.dropped[i],]}
+\NormalTok{\}}
+\NormalTok{\}}
+
+
+\NormalTok{##clean up the final matched data.frame}
+\NormalTok{mydat.MAX <-}\StringTok{ }\KeywordTok{as.data.frame}\NormalTok{(}\KeywordTok{as.matrix}\NormalTok{(mydat.MAX))}
+
+\NormalTok{mydat.MAX <-}\StringTok{ }\KeywordTok{data.frame}\NormalTok{(}\DataTypeTok{animal =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{species, }
+                        \DataTypeTok{species =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{species, }
+                        \DataTypeTok{mass.aa =}\NormalTok{ (}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{as.character}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{mass))), }
+                        \DataTypeTok{weigted.dist.v =}
+\NormalTok{                          (}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{as.character}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{weigted.dist.v))), }
+                        \DataTypeTok{ld50 =}\NormalTok{ (}\KeywordTok{as.numeric}\NormalTok{(}\KeywordTok{as.character}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{ld50))),}
+                        \DataTypeTok{ld50_method  =} \KeywordTok{factor}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{ld50_method, }
+                                              \DataTypeTok{levels =} \KeywordTok{c}\NormalTok{(}\StringTok{"sc"}\NormalTok{,}
+                                                         \StringTok{"iv"}\NormalTok{,}
+                                                         \StringTok{"ip"}\NormalTok{,}
+                                                         \StringTok{"im"}\NormalTok{)), }
+                        \DataTypeTok{dim =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{dimensions, }
+                        \DataTypeTok{egg.bin =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{egg.bin, }
+                        \DataTypeTok{env =} \KeywordTok{factor}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{env, }
+                                     \DataTypeTok{levels =} \KeywordTok{c}\NormalTok{(}\StringTok{"terrestrial"}\NormalTok{,}
+                                                \StringTok{"arboreal"}\NormalTok{,}
+                                                \StringTok{"aquatic"}\NormalTok{)),}
+                        \DataTypeTok{con =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{con,}
+                        \DataTypeTok{fam =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{fam,}
+                        \DataTypeTok{mod_class =} \KeywordTok{factor}\NormalTok{(mydat.MAX}\OperatorTok{$}\NormalTok{mod_class, }
+                                     \DataTypeTok{levels =} \KeywordTok{c}\NormalTok{(}\StringTok{"mammal"}\NormalTok{,}
+                                                \StringTok{"amphibian"}\NormalTok{,}
+                                                \StringTok{"artropod"}\NormalTok{,}
+                                                \StringTok{"bird"}\NormalTok{,}
+                                                \StringTok{"fish"}\NormalTok{,}
+                                                \StringTok{"lizard"}\NormalTok{)),}
+                        \DataTypeTok{se_er =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{se_error)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Set the parameters}\label{set-the-parameters}
+
+Here we set the number of iterations, the thinning and the burn-in
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{#if you want to include species and ld50 method as a fixed term.}
+
+\CommentTok{#nitt <- 1200000}
+\CommentTok{#thin <- 500}
+\CommentTok{#burnin <- 200000}
+
+\NormalTok{nitt <-}\StringTok{ }\DecValTok{12000}
+\NormalTok{thin <-}\StringTok{ }\DecValTok{5}
+\NormalTok{burnin <-}\StringTok{ }\DecValTok{2000}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Set the prior}\label{set-the-prior}
+
+Set the prior. Here we stick with a uninformative prior.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{prior<-}\KeywordTok{list}\NormalTok{(}\DataTypeTok{R =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{V =} \DecValTok{1}\NormalTok{, }\DataTypeTok{nu=}\FloatTok{0.002}\NormalTok{), }
+            \DataTypeTok{G =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{G1=}\KeywordTok{list}\NormalTok{(}\DataTypeTok{V =} \DecValTok{1}\NormalTok{,}
+                             \DataTypeTok{n =} \DecValTok{1}\NormalTok{, }
+                             \DataTypeTok{alpha.mu =} \KeywordTok{rep}\NormalTok{(}\DecValTok{0}\NormalTok{,}\DecValTok{1}\NormalTok{),}
+                             \DataTypeTok{alpha.V=} \DecValTok{10}\OperatorTok{^}\DecValTok{3}\NormalTok{), }
+                     \DataTypeTok{G1=}\KeywordTok{list}\NormalTok{(}\DataTypeTok{V =} \DecValTok{1}\NormalTok{,}
+                             \DataTypeTok{n =} \DecValTok{1}\NormalTok{, }
+                             \DataTypeTok{alpha.mu =} \KeywordTok{rep}\NormalTok{(}\DecValTok{0}\NormalTok{,}\DecValTok{1}\NormalTok{), }
+                             \DataTypeTok{alpha.V =} \DecValTok{10}\OperatorTok{^}\DecValTok{3}\NormalTok{)))}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Run the full model}\label{run-the-full-model}
+
+Now we run the full model with both venom volume and Ld50 included as
+response variables. We also allow for co-variance between these two
+terms.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{full_model <-}\StringTok{ }\KeywordTok{MCMCglmm}\NormalTok{(ld50 }\OperatorTok{~}\StringTok{ }
+\StringTok{                         }\NormalTok{mass.aa }\OperatorTok{+}\StringTok{ }
+\StringTok{                         }\NormalTok{ld50_method }\OperatorTok{+}\StringTok{ }
+\StringTok{                         }\NormalTok{dim }\OperatorTok{+}\StringTok{ }
+\StringTok{                         }\NormalTok{egg.bin }\OperatorTok{+}\StringTok{ }
+\StringTok{                         }\NormalTok{weigted.dist.v }\OperatorTok{+}
+\StringTok{                         }\NormalTok{mod_class }\OperatorTok{+}
+\StringTok{                         }\NormalTok{con }\OperatorTok{+}
+\StringTok{                         }\NormalTok{fam, }
+                       \DataTypeTok{random =} \OperatorTok{~}\StringTok{ }\NormalTok{animal }\OperatorTok{+}\StringTok{ }
+\StringTok{                                 }\NormalTok{species,}
+                       \DataTypeTok{rcov =} \OperatorTok{~}\StringTok{ }\NormalTok{units,}
+                       \DataTypeTok{mev =}\NormalTok{ mydat.MAX}\OperatorTok{$}\NormalTok{se_error,}
+                       \DataTypeTok{data =}\NormalTok{ mydat.MAX, }
+                       \DataTypeTok{pedigree =}\NormalTok{ max.tree, }
+                       \DataTypeTok{prior =}\NormalTok{ prior,}
+                       \DataTypeTok{family =} \KeywordTok{c}\NormalTok{(}\StringTok{"gaussian"}\NormalTok{), }
+                       \DataTypeTok{nitt =}\NormalTok{ nitt, }
+                       \DataTypeTok{thin =}\NormalTok{ thin, }
+                       \DataTypeTok{burnin =}\NormalTok{ burnin,}
+                       \DataTypeTok{verbose=} \OtherTok{FALSE}\NormalTok{)}
+
+\KeywordTok{summary}\NormalTok{(full_model)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+##  Iterations = 2001:11996
+##  Thinning interval  = 5
+##  Sample size  = 2000 
+## 
+##  DIC: 635.6339 
+## 
+##  G-structure:  ~animal
+## 
+##        post.mean  l-95% CI u-95% CI eff.samp
+## animal    0.3838 4.643e-06   0.7057    120.8
+## 
+##                ~species
+## 
+##         post.mean  l-95% CI u-95% CI eff.samp
+## species   0.05889 2.066e-09    0.156    76.74
+## 
+##  R-structure:  ~units
+## 
+##       post.mean l-95% CI u-95% CI eff.samp
+## units    0.1765   0.1534   0.2019     2029
+## 
+##  Location effects: ld50 ~ mass.aa + ld50_method + dim + egg.bin + weigted.dist.v + mod_class + con + fam 
+## 
+##                    post.mean  l-95% CI  u-95% CI eff.samp  pMCMC    
+## (Intercept)        -0.458513 -1.745286  0.764817     1656  0.463    
+## mass.aa             0.258622  0.058325  0.456719     1474  0.012 *  
+## ld50_methodiv      -0.380720 -0.505845 -0.261469     2000 <5e-04 ***
+## ld50_methodip      -0.290897 -0.416737 -0.176109     1995 <5e-04 ***
+## ld50_methodim      -0.048576 -0.209389  0.101691     2000  0.565    
+## dim3               -0.314887 -0.665171  0.052405     1256  0.101    
+## egg.binyes          1.125189  0.564930  1.649468     2000  0.001 ***
+## weigted.dist.v      0.222102  0.147656  0.296963     1238 <5e-04 ***
+## mod_classamphibian  0.794413  0.309725  1.218830     2000 <5e-04 ***
+## mod_classartropod   2.003471  1.366261  2.647137     2000 <5e-04 ***
+## mod_classbird      -0.742039 -0.975972 -0.514100     2610 <5e-04 ***
+## mod_classfish      -0.016094 -0.210673  0.178150     2000  0.869    
+## mod_classlizard     0.008027 -0.211743  0.217818     2000  0.945    
+## conyes             -0.143178 -0.761908  0.417089     1424  0.657    
+## famDipsadidae      -0.422792 -1.803625  0.987003     2146  0.546    
+## famElapidae        -1.058470 -2.238799  0.240534     2000  0.094 .  
+## famLamprophiidae   -0.581534 -2.340967  0.875132     1817  0.464    
+## famNatricidae       0.167848 -1.142719  1.544504     2000  0.802    
+## famViperidae       -0.309690 -1.723281  1.042709     2000  0.636    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+\end{verbatim}
+
+\subsection{Run the full model}\label{run-the-full-model-1}
+
+Now we calculated the proportion of variance associated with phylogeny,
+species level and residual for both volume and LD50
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ld_50_prop_phlyo <-}\StringTok{ }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"animal"}\NormalTok{]}\OperatorTok{/}
+\StringTok{                    }\NormalTok{(full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"animal"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"species"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"units"}\NormalTok{])}
+
+\NormalTok{ld_50_prop_species <-}\StringTok{ }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"species"}\NormalTok{]}\OperatorTok{/}
+\StringTok{                    }\NormalTok{(full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"animal"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"species"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"units"}\NormalTok{])}
+
+\NormalTok{ld_50_prop_units <-}\StringTok{ }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"units"}\NormalTok{]}\OperatorTok{/}
+\StringTok{                    }\NormalTok{(full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"animal"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"species"}\NormalTok{] }\OperatorTok{+}
+\StringTok{                     }\NormalTok{full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"units"}\NormalTok{])}
+
+\KeywordTok{hdr}\NormalTok{(ld_50_prop_phlyo)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## $hdr
+##             [,1]       [,2]      [,3]      [,4]      [,5]      [,6]
+## 99% -0.013291345 0.06706244 0.1185889 0.8570325        NA        NA
+## 95% -0.004925479 0.05052030 0.1598634 0.1713596 0.2769564 0.8519312
+## 50%  0.601386193 0.78185656        NA        NA        NA        NA
+## 
+## $mode
+## [1] 0.7236762
+## 
+## $falpha
+##        1%        5%       50% 
+## 0.2335404 0.2957081 2.0484298
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{hdr}\NormalTok{(ld_50_prop_species)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## $hdr
+##             [,1]      [,2]      [,3]      [,4]     [,5]      [,6]
+## 99% -0.015606958 0.4777422 0.4850483 0.5136107       NA        NA
+## 95% -0.013596264 0.3300717 0.3392896 0.3622628 0.388692 0.3937955
+## 50% -0.005242783 0.0780242        NA        NA       NA        NA
+##          [,7]      [,8]
+## 99%        NA        NA
+## 95% 0.4030342 0.4213126
+## 50%        NA        NA
+## 
+## $mode
+## [1] 0.006701967
+## 
+## $falpha
+##        1%        5%       50% 
+## 0.2040615 0.4277609 3.7249732
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{hdr}\NormalTok{(ld_50_prop_units)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## $hdr
+##          [,1]      [,2]
+## 99% 0.1375530 0.5359792
+## 95% 0.1622049 0.4783413
+## 50% 0.2244423 0.3231759
+## 
+## $mode
+## [1] 0.2605166
+## 
+## $falpha
+##        1%        5%       50% 
+## 0.2452654 0.8434278 4.1595651
+\end{verbatim}
+
+\subsubsection{plot the full model}\label{plot-the-full-model}
+
+We plot the posterior distributions in a table using the
+\texttt{MultiDisPlot} function.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ld50_post <-}\StringTok{ }\KeywordTok{list}\NormalTok{(full_model}\OperatorTok{$}\NormalTok{Sol[,}\DecValTok{1}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"mass.aa"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"ld50_methodiv"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"ld50_methodip"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"ld50_methodim"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"dim3"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"egg.binyes"}\NormalTok{],}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{Sol[,}\StringTok{"weigted.dist.v"}\NormalTok{],}
+\NormalTok{                 ld_50_prop_phlyo,}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"animal"}\NormalTok{],}
+\NormalTok{                 ld_50_prop_species,}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"species"}\NormalTok{],}
+\NormalTok{                 ld_50_prop_units,}
+\NormalTok{                 full_model}\OperatorTok{$}\NormalTok{VCV[,}\StringTok{"units"}\NormalTok{]}
+\NormalTok{                 )}
+\KeywordTok{MultiDisPlot}\NormalTok{(ld50_post)}
+\KeywordTok{abline}\NormalTok{(}\DataTypeTok{v =} \DecValTok{0}\NormalTok{, }\DataTypeTok{lty =} \DecValTok{2}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{LD50_mev_run_files/figure-latex/MultiDisPlot plot-1.pdf}
+
+
+\end{document}

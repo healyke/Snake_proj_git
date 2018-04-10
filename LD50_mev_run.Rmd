@@ -1,0 +1,345 @@
+---
+title: "Snake_mev_analysis"
+author: "Kevin Healy"
+date: "05/04/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+# Summary
+This script runs the model which includes error associated with the measurement of LD50 values were this information is reported.
+
+# Upload stuff
+## Packages
+
+First the required packages are uploaded. These include .MCMCglmm' which is used for the main linear analysis, 'phytools' and 'caper'. to handle the phylogenies and finally 'hdrcde', 'wesanderson' and the 'MultiDisPlot.R' function to make some of the plots.
+
+```{r packages, tidy = TRUE, results = "hide"}
+
+library(phytools)
+library(caper)
+library(MCMCglmm)
+library(wesanderson)
+library(hdrcde)
+source("MultiDisPlot.R")
+```
+
+
+## data
+Next we upload the main data file. Only species which had a reported mean yield measure, an LD50 measure and diet with prey item proportions were included. See the methods section in the main paper for a description of the data.
+
+```{r data}
+ld50_data <- read.csv("S2_snake_data_5_april.csv",header=T,sep=",")
+
+```
+
+## Phylogeny
+We use the phylogeny from Pyron et al 2014 to control for phylogeny in our main model.
+
+```{r phylo}
+tree <- read.tree("liz_and_snake_time_tree.txt")
+#this seems to fix a dublicate problem caused by polynomies in the tree
+Tree<-makeLabel(tree)
+Tree<-makeLabel(Tree)
+```
+
+
+##Convert each value into a standard error term
+
+We collated  measures of error associated with LD50 values when reported. All error measures associated with LD50 values were converted to standard error for inclusion as a measurement error term using the `mev` term in the `MCMCglmm` model. Where errors were reported as confidence intervals (Ci) they were log transformed, to correspond with the log transformation of the reposne variable, and converted using $SE = (u - lower Ci_{95})/1.96$ or $SE = (u - lower Ci_{99})/2.58$. For 5% Fiducial limits we treat these as confidence intervals and for ranges we treat these as 99% confidence intervals. Were Standard deviations are given we use the total number of mice given as the sample size to first convert it into a 95% Ci for log trasnformation and then to SE as above.
+
+
+```{r error calulation}
+
+se_error <- vector()
+
+for(i in 1:length(ld50_data$ld50_error)){
+  
+   #95% credability interval
+  if(ld50_data$Error_type[i] ==  "95_confidence_interval") 
+    {se_error[i] <-  ((log10(ld50_data$ld50_mg[i]) - log10(as.numeric(gsub("-.*", "", ld50_data$ld50_error[i])))) / 1.96)}
+
+  #Standard deviation will be left as is unless I can get the number of samples
+    else{  if(ld50_data$Error_type[i] ==  "sd") 
+    {lower95_temp <- (ld50_data$ld50_mg[i] - ((as.numeric(gsub("-.*", "", ld50_data$ld50_error[i])))*1.96)/(4^0.5))
+      
+      se_error[i] <-  ((log10(ld50_data$ld50_mg[i]) - log10(lower95_temp)) / 1.96)}
+    
+  #for range lets assume a 99% range and a z-value of 2.58
+          else{  if(ld50_data$Error_type[i] ==  "max_min" | ld50_data$Error_type[i] ==  "range") 
+  {se_error[i] <-  ((log10(ld50_data$ld50_mg[i]) - log10(as.numeric(gsub("-.*", "", ld50_data$ld50_error[i])))) / 2.58)}
+    
+  #for Fiducial limits we treat them as confidence intervals
+                   else{  if(ld50_data$Error_type[i] ==  "5% Fiducial limits") 
+  {se_error[i] <-  ((log10(ld50_data$ld50_mg[i]) - log10(as.numeric(gsub("-.*", "", ld50_data$ld50_error[i])))) / 1.96)}
+       
+                     
+                                        else{ se_error[i] <- NA
+    
+                                    
+        }     
+      }
+    }
+  } 
+}
+
+
+
+se_error[which(is.na(se_error))] <-  max(na.omit(se_error))
+```
+
+## Data transformation
+
+
+```{r transform}
+
+ld50_clean  <- ld50_data
+
+#mass
+mass <- log10(ld50_clean $mass_grams)
+
+animal <- ld50_clean $species
+species <- ld50_clean $species
+
+##volume
+vol.v <- log10(as.numeric(as.vector(ld50_clean $venom_yield_mg)))
+
+#dimension
+dimensions <- ld50_clean $dimensions
+
+#LD50
+ld50_mg <- log10(as.vector(ld50_clean $ld50_mg))
+
+ld50_method <- ld50_clean $ld50_method
+
+##This just checks if eggs were rcorded within the diet.
+eggs <- ld50_clean[,c("eggs")] 
+egg.bin <- rep(0,length(eggs))
+
+for(i in 1:(length(eggs))){
+if(ld50_clean[i,c("eggs")] > 0) egg.bin[i] <- "yes"
+else egg.bin[i] <- "no"
+}
+
+
+##This is the weigethed evolutionary distance between prey and diet.
+weigted.dist.v <- (ld50_clean$phylo_distance_diet_model_my)/100
+
+##the species habitat
+env <- ld50_clean$environment
+
+##whether they constrict
+con <- ld50_clean$constriction
+
+##the taxinomic family of the species
+fam <- ld50_clean$family
+
+##the class of the model used to measure LD50
+mod_class <- ld50_clean$ld50_model_class
+
+```
+
+
+## full model
+
+Now we set up the model to insure that there is a corresponding animal column within the data frame in order for the phylogeny to match up. We also include as separate "species" term to account for variation associated with multiple measures for a single species.
+
+```{r full model setup}
+
+
+###full model variables that we want with NA's removed
+mydat.max <- na.omit(data.frame(animal, 
+                        species, 
+                        mass, 
+                        weigted.dist.v = weigted.dist.v, 
+                        dimensions = dimensions, 
+                        ld50 = ld50_mg, 
+                        ld50_method, 
+                        dimensions, 
+                        egg.bin, 
+                        env, 
+                        con, 
+                        fam,
+                        mod_class,
+                        se_error = as.vector(se_error)))
+
+
+###create a dummy variable of just the species we have to prune the phylogeny
+spec_dropped <-as.data.frame(matrix(0, nrow = c(length(unique(mydat.max[,"species"]))), 
+                                    ncol = c(2), dimnames = list(c(),c("species","dummy"))))
+spec_dropped[,1] <- unique(mydat.max$species)
+spec_dropped[,2] <- rep(0,length = c(length(unique(mydat.max[,"species"]))))
+spec_dropped <- as.data.frame(spec_dropped)
+
+max.dat <- comparative.data(data= spec_dropped, 
+                            phy= Tree, 
+                            names.col="species", 
+                            vcv=FALSE)
+max.tree <- chronoMPL(max.dat$phy)
+
+
+max.dropped <- max.dat$dropped$unmatched.rows
+
+mydat.MAX <- mydat.max
+if((length(max.dropped) > c(0)) == TRUE){
+for(i in 1:(length(max.dropped))){
+mydat.MAX <-mydat.MAX[mydat.MAX$species != max.dropped[i],]
+}
+}
+
+
+##clean up the final matched data.frame
+mydat.MAX <- as.data.frame(as.matrix(mydat.MAX))
+
+mydat.MAX <- data.frame(animal = mydat.MAX$species, 
+                        species = mydat.MAX$species, 
+                        mass.aa = (as.numeric(as.character(mydat.MAX$mass))), 
+                        weigted.dist.v =
+                          (as.numeric(as.character(mydat.MAX$weigted.dist.v))), 
+                        ld50 = (as.numeric(as.character(mydat.MAX$ld50))),
+                        ld50_method  = factor(mydat.MAX$ld50_method, 
+                                              levels = c("sc",
+                                                         "iv",
+                                                         "ip",
+                                                         "im")), 
+                        dim = mydat.MAX$dimensions, 
+                        egg.bin = mydat.MAX$egg.bin, 
+                        env = factor(mydat.MAX$env, 
+                                     levels = c("terrestrial",
+                                                "arboreal",
+                                                "aquatic")),
+                        con = mydat.MAX$con,
+                        fam = mydat.MAX$fam,
+                        mod_class = factor(mydat.MAX$mod_class, 
+                                     levels = c("mammal",
+                                                "amphibian",
+                                                "artropod",
+                                                "bird",
+                                                "fish",
+                                                "lizard")),
+                        se_er = mydat.MAX$se_error)
+
+```
+
+
+
+##Set the parameters
+Here we set the number of iterations, the thinning and the burn-in
+
+```{r parameters}
+#if you want to include species and ld50 method as a fixed term.
+
+#nitt <- 1200000
+#thin <- 500
+#burnin <- 200000
+
+nitt <- 12000
+thin <- 5
+burnin <- 2000
+
+```
+
+
+##Set the prior
+
+Set the prior. Here we stick with a uninformative prior.
+
+```{r prior}
+prior<-list(R = list(V = 1, nu=0.002), 
+            G = list(G1=list(V = 1,
+                             n = 1, 
+                             alpha.mu = rep(0,1),
+                             alpha.V= 10^3), 
+                     G1=list(V = 1,
+                             n = 1, 
+                             alpha.mu = rep(0,1), 
+                             alpha.V = 10^3)))
+
+```
+
+##Run the full model
+Now we run the full model with both venom volume and Ld50 included as response variables. We also allow for co-variance between these two terms.
+
+```{r full model}
+
+full_model <- MCMCglmm(ld50 ~ 
+                         mass.aa + 
+                         ld50_method + 
+                         dim + 
+                         egg.bin + 
+                         weigted.dist.v +
+                         mod_class +
+                         con +
+                         fam, 
+                       random = ~ animal + 
+                                 species,
+                       rcov = ~ units,
+                       mev = mydat.MAX$se_error,
+                       data = mydat.MAX, 
+                       pedigree = max.tree, 
+                       prior = prior,
+                       family = c("gaussian"), 
+                       nitt = nitt, 
+                       thin = thin, 
+                       burnin = burnin,
+                       verbose= FALSE)
+
+summary(full_model)
+```
+
+
+##Run the full model
+Now we calculated the proportion of variance associated with phylogeny, species level and residual for both volume and LD50
+
+```{r H2}
+ld_50_prop_phlyo <- full_model$VCV[,"animal"]/
+                    (full_model$VCV[,"animal"] +
+                     full_model$VCV[,"species"] +
+                     full_model$VCV[,"units"])
+
+ld_50_prop_species <- full_model$VCV[,"species"]/
+                    (full_model$VCV[,"animal"] +
+                     full_model$VCV[,"species"] +
+                     full_model$VCV[,"units"])
+
+ld_50_prop_units <- full_model$VCV[,"units"]/
+                    (full_model$VCV[,"animal"] +
+                     full_model$VCV[,"species"] +
+                     full_model$VCV[,"units"])
+
+hdr(ld_50_prop_phlyo)
+hdr(ld_50_prop_species)
+hdr(ld_50_prop_units)
+
+
+```
+
+###plot the full model
+
+We plot the posterior distributions in a table using the `MultiDisPlot` function.
+
+I need to update this table
+
+```{r MultiDisPlot plot}
+
+ld50_post <- list(full_model$Sol[,1],
+                 full_model$Sol[,"mass.aa"],
+                 full_model$Sol[,"ld50_methodiv"],
+                 full_model$Sol[,"ld50_methodip"],
+                 full_model$Sol[,"ld50_methodim"],
+                 full_model$Sol[,"dim3"],
+                 full_model$Sol[,"egg.binyes"],
+                 full_model$Sol[,"weigted.dist.v"],
+                 ld_50_prop_phlyo,
+                 full_model$VCV[,"animal"],
+                 ld_50_prop_species,
+                 full_model$VCV[,"species"],
+                 ld_50_prop_units,
+                 full_model$VCV[,"units"]
+                 )
+MultiDisPlot(ld50_post)
+abline(v = 0, lty = 2)
+```
+
